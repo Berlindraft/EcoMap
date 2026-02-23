@@ -4,15 +4,15 @@ A modular FastAPI project template with AI inference-ready structure, designed f
 
 ## Project Structure
 
-fastapi_project/
-├── app/
-│ ├── main.py # FastAPI application entry point
-│ ├── routes/ # API route definitions
-│ ├── models/ # Data models and schemas
-│ ├── services/ # Business logic or AI inference code
-│ └── core/ # Configuration, constants, utils
-├── venv/ # Virtual environment (ignored in Git)
-└── requirements.txt # Project dependencies
+      fastapi_project/
+      ├── app/
+      │ ├── main.py # FastAPI application entry point
+      │ ├── routes/ # API route definitions
+      │ ├── models/ # Data models and schemas
+      │ ├── services/ # Business logic or AI inference code
+      │ └── core/ # Configuration, constants, utils
+      ├── venv/ # Virtual environment (ignored in Git)
+      └── requirements.txt # Project dependencies
 
 ## Setup Instructions
 
