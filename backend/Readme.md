@@ -45,7 +45,7 @@ Install dependencies:
 Running the Application:
 Start the FastAPI server using Uvicorn:
 
-    uvicorn app.main:app --reload
+    uvicorn app.main:app --reload or python -m uvicorn app.main:app --reload
 
 --reload → auto reloads server on code changes (development only)
 
