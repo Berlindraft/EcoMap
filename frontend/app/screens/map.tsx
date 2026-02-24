@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React, { useRef, useState } from "react";
 import {
   View,
@@ -185,11 +184,11 @@ const darkMapStyle = [
 ];
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, },
   map: { width, height },
   filtersContainer: {
     position: "absolute",
-    top: 40,
+    top: 60,
     left: 16,
     right: 16,
     backgroundColor: "rgba(39,39,42,0.9)",
@@ -214,29 +213,4 @@ const styles = StyleSheet.create({
   filterTextActive: { color: "#000", fontSize: 12, fontWeight: "700" },
   webContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
   webText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-=======
-import React from "react";
-import { StyleSheet } from "react-native";
-import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
-
-export default function MapScreen() {
-  return (
-    <MapView
-      provider={PROVIDER_GOOGLE}
-      style={styles.map}
-      initialRegion={{
-        latitude: 10.3157,
-        longitude: 123.8854,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }}
-    />
-  );
-}
-
-const styles = StyleSheet.create({
-  map: {
-    flex: 1,
-  },
->>>>>>> 8f579f976825d45999329a877d2947ba5c22ba6e
 });
