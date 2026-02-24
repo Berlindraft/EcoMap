@@ -42,11 +42,6 @@ yarn-error.log*
 # Vite
 *.tsbuildinfo
 
-<<<<<<< HEAD
-# Expo cache and build files
-frontend/.expo/
-=======
 # AI Agent
 .agent/
 .expo/
->>>>>>> 949038a5c27cea67946d14b69f1112c9023ba2b5
