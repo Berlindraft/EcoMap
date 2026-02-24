@@ -72,14 +72,14 @@ export default function WelcomeView({ setView }: Props) {
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={styles.loginButton}
-                onPress={() => router.push("/login")}
+                onPress={() => router.push("/login-and-authetication/login")}
               >
                 <Text style={styles.loginText}>Login</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.signupButton}
-                onPress={() => router.push("/signup")}
+                onPress={() => router.push("/login-and-authetication/signup")}
               >
                 <Text style={styles.signupText}>Sign Up</Text>
               </TouchableOpacity>
