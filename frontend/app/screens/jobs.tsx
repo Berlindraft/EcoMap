@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import Navbar from "../navbar";
 
 export default function JobsScreen() {
-  const [currentView, setCurrentView] = useState("jobs");
   const MICRO_JOBS = [
   { id: "1", type: "Labor", title: "Pick up plastic waste", location: "Cebu City", pay: "50 pts", time: "2 hrs ago" },
   { id: "2", type: "Volunteer", title: "Assist in community cleanup", location: "Mandaue City", pay: "100 pts", time: "1 day ago" },
@@ -58,7 +57,6 @@ export default function JobsScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
-    <Navbar currentView={currentView} setCurrentView={setCurrentView} />
     </View>
   );
 }

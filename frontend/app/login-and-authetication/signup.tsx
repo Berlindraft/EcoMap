@@ -32,7 +32,8 @@ export default function SignupView({ setView }: Props) {
     >
       <Stack.Screen
         options={{
-          headerShown: false, // <-- hides the header
+          headerShown: false, 
+          animation: 'fade'
         }}
       />
       <ScrollView

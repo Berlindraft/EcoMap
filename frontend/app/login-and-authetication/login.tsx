@@ -31,7 +31,8 @@ export default function LoginView({ setView }: Props) {
     >
       <Stack.Screen
         options={{
-          headerShown: false, // <-- hides the header
+          headerShown: false,
+          animation: 'fade',
         }}
       />
       <ScrollView

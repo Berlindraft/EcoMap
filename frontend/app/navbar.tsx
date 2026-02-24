@@ -37,6 +37,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) => {
 
   return (
     <View style={[styles.navbar, { width: screenWidth }]}>
+      
       {navItems.map((item) => {
         const isActive = currentView === item.id;
 

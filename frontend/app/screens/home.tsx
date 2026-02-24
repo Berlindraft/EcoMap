@@ -81,11 +81,6 @@ export default function HomeScreen() {
         style={styles.reportCard}
         onPress={() => console.log("Report clicked")}
       >
-        <Stack.Screen
-        options={{
-          headerShown: false, // <-- hides the header
-        }}
-      />
         <View style={[styles.reportIcon, { backgroundColor: bgColor }]}>
           <Ionicons name={iconName} size={20} color={iconColor} />
         </View>
@@ -208,7 +203,6 @@ export default function HomeScreen() {
           scrollEnabled={false}
         />
       </ScrollView>
-      <Navbar currentView={currentView} setCurrentView={setCurrentView} />
     </View>
   );
 }

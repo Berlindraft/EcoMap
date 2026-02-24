@@ -5,7 +5,6 @@ import Navbar from "../navbar";
 
 export default function RewardsScreen() {
   const [points, setPoints] = useState(100);
-  const [currentView, setCurrentView] = useState("rewards");
   const REWARDS = [
     { id: "1", name: "Eco Bag", cost: 50, icon: "🛍️" },
     { id: "2", name: "Reusable Bottle", cost: 100, icon: "🥤" },
@@ -67,7 +66,6 @@ export default function RewardsScreen() {
         })}
       </View>
     </ScrollView>
-    <Navbar currentView={currentView} setCurrentView={setCurrentView} />
     </View>
   );
 }

@@ -72,7 +72,6 @@ export default function MapScreen() {
   ];
 
   const mapRef = useRef<MapView>(null);
-  const [currentView, setCurrentView] = useState("map");
 
   // Region centered on Cebu City
   const region = {
@@ -161,8 +160,6 @@ export default function MapScreen() {
           </TouchableOpacity>
         </ScrollView>
       </View>
-        <Navbar currentView={currentView} setCurrentView={setCurrentView} />
-
     </View>
   );
 }
