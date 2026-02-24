@@ -41,3 +41,7 @@ yarn-error.log*
 
 # Vite
 *.tsbuildinfo
+
+# AI Agent
+.agent/
+.expo/
