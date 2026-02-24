@@ -70,6 +70,9 @@ export default function LoginView({ setView }: Props) {
           <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
             <Text style={styles.loginText}>Login</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.loginButton} onPress={() => router.push("/screens/map")}>
+            <Text style={styles.loginText}>Go to Map</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Footer */}
