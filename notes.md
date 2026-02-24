@@ -120,7 +120,7 @@ Social/Cultural Factors       MEDIUM       Community engagement strategy
 
 ## Development Roadmap
 
-### Phase 1: MVP (Months 1–4)
+### Phase 1: MVP 
 **Deliverables:**
 - [ ] Core mobile app (iOS/Android via React Native + Expo)
 - [ ] Waste reporting + photo upload with geotagging
@@ -134,7 +134,7 @@ Social/Cultural Factors       MEDIUM       Community engagement strategy
 - 500+ verified waste reports
 - 85%+ AI classification accuracy
 
-### Phase 2: Marketplace & Dashboard (Months 5–8)
+### Phase 2: Marketplace & Dashboard 
 **Deliverables:**
 - [ ] TrashCare micro-job marketplace
 - [ ] LGU command center (SaaS dashboard)
@@ -147,7 +147,7 @@ Social/Cultural Factors       MEDIUM       Community engagement strategy
 - 1,000+ active users
 - 3+ LGU deployments (pilot)
 
-### Phase 3: Scale & Optimization (Months 9–12)
+### Phase 3: Scale & Optimization 
 **Deliverables:**
 - [ ] Advanced predictive analytics (hotspot forecasting)
 - [ ] Compliance monitoring dashboard enhancement
