@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "803920452",
+    "project_id": "ecomap-edced",
+    "storage_bucket": "ecomap-edced.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:803920452:android:68c86b8261737bf9baba11",
+        "android_client_info": {
+          "package_name": "com.zero.ecomap"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxb8_7fuJ02c105wgCDf8ZlYMRtVtjaZw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
