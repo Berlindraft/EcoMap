@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import React, { useState } from "react";
 import {
   View,
@@ -21,8 +21,7 @@ export default function LoginView({ setView }: Props) {
   const [password, setPassword] = useState("");
 
   const handleLogin = () => {
-    // No backend logic — just redirect
-    setView("home");
+    router.push("/screens/home")
   };
 
   return (
@@ -30,6 +29,11 @@ export default function LoginView({ setView }: Props) {
       style={{ flex: 1, backgroundColor: "#000" }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <Stack.Screen
+        options={{
+          headerShown: false, // <-- hides the header
+        }}
+      />
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
