@@ -278,7 +278,7 @@ The "waste-to-income" or circular economy framework demonstrates that waste segr
 
 ---
 
-## Expected Impact Metrics (12-Month Projection)
+## Expected Impact Metrics 
 
 - **Citizens Engaged:** 50,000+ active users in Cebu City
 - **Reports Verified:** 100,000+ waste hotspot reports processed
@@ -331,19 +331,19 @@ We welcome contributions from developers, data scientists, environmental advocat
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the Phishermen License. See the LICENSE file for details.
 
 ---
 
 ## Contact & Support
 
-- **Project Lead:** [Contact Information]
-- **Email:** hello@ecomap.cebu
-- **Website:** www.ecomap.cebu
-- **GitHub:** [Repository URL]
-- **For LGU Inquiries (SaaS):** lgu@ecomap.cebu
+- **Project by:** Phishermen
+- **Email:** 
+- **Website:** 
+- **GitHub:** 
+- **For LGU Inquiries (SaaS):** 
 
 ---
 
 **Created:** February 2026
-**Last Updated:** February 24, 2026
+**Last Updated:** ... 
