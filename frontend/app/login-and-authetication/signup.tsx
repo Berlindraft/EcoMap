@@ -15,12 +15,13 @@ type Props = {
   setView: (view: string) => void;
 };
 
-export default function LoginView({ setView }: Props) {
-  const router = useRouter();      
+export default function SignupView({ setView }: Props) {
+  const router = useRouter(); 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = () => {
+  const handleSignup = () => {
     // No backend logic — just redirect
     setView("home");
   };
@@ -36,13 +37,22 @@ export default function LoginView({ setView }: Props) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Login to continue cleaning Cebu 🌱</Text>
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.subtitle}>Join EcoMap today 🌍</Text>
         </View>
 
         {/* Form */}
         <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>Full Name</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Enter your full name"
+            placeholderTextColor="#9ca3af"
+            style={styles.input}
+          />
+
+          <Text style={[styles.label, { marginTop: 20 }]}>Email</Text>
           <TextInput
             value={email}
             onChangeText={setEmail}
@@ -63,16 +73,16 @@ export default function LoginView({ setView }: Props) {
             style={styles.input}
           />
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginText}>Login</Text>
+          <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
+            <Text style={styles.signupText}>Sign Up</Text>
           </TouchableOpacity>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Don’t have an account? </Text>
-          <TouchableOpacity onPress={() => router.push("/signup")}>
-            <Text style={styles.signupText}>Sign up</Text>
+          <Text style={styles.footerText}>Already have an account? </Text>
+          <TouchableOpacity onPress={() => router.push("/login-and-authetication/login")}>
+            <Text style={styles.loginText}>Login</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -118,7 +128,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginTop: 6,
   },
-  loginButton: {
+  signupButton: {
     backgroundColor: "#84cc16",
     paddingVertical: 14,
     borderRadius: 14,
@@ -129,7 +139,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 15,
   },
-  loginText: {
+  signupText: {
     color: "#000",
     fontWeight: "700",
     fontSize: 16,
@@ -143,7 +153,7 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
     fontSize: 14,
   },
-  signupText: {
+  loginText: {
     color: "#84cc16",
     fontWeight: "600",
     fontSize: 14,
