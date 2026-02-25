@@ -15,6 +15,7 @@ CREATE TABLE users (
     user_id BIGSERIAL PRIMARY KEY,
     full_name VARCHAR(150) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
+    password VARCHAR(256) NOT NULL,
     phone VARCHAR(30),
     role_id SMALLINT REFERENCES roles(role_id),
     profile_photo TEXT,
