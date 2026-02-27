@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
-import { useRouter } from "expo-router";
-import { Feather } from "@expo/vector-icons"; // Icons (like Lucide)
+import { useRouter, useSegments } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 
 type NavItem = {
   id: string;
@@ -26,23 +26,20 @@ const routeMap: Record<string, string> = {
   rewards: "/screens/rewards",
 };
 
-interface NavbarProps {
-  currentView: string;
-  setCurrentView?: (view: string) => void; // optional if you want state in parent
-}
-
-const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) => {
+const Navbar: React.FC = () => {
   const router = useRouter();
+  const segments = useSegments() as string[];
   const screenWidth = Dimensions.get("window").width;
+
+  // Derive active tab from the current route segment
+  const currentView = segments[1] || "home";
 
   return (
     <View style={[styles.navbar, { width: screenWidth }]}>
-      
       {navItems.map((item) => {
         const isActive = currentView === item.id;
 
         const handlePress = () => {
-          if (setCurrentView) setCurrentView(item.id);
           router.push(routeMap[item.id] as any);
         };
 
@@ -84,6 +81,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     backgroundColor: "#18181B",
     paddingVertical: 12,
+    paddingBottom: 50,
     paddingHorizontal: 10,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

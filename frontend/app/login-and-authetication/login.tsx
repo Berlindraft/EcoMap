@@ -9,19 +9,38 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
+import { useAuth } from "../../contexts/AuthContext";
 
-type Props = {
-  setView: (view: string) => void;
-};
-
-export default function LoginView({ setView }: Props) {
-  const router = useRouter();      
+export default function LoginView() {
+  const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    router.push("/screens/home")
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter email and password.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await login(email, password);
+      router.replace("/screens/home");
+    } catch (err: any) {
+      const msg =
+        err?.code === "auth/invalid-credential"
+          ? "Invalid email or password."
+          : err?.code === "auth/user-not-found"
+          ? "No account found with that email."
+          : err?.message || "Login failed.";
+      Alert.alert("Login Failed", msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -29,12 +48,7 @@ export default function LoginView({ setView }: Props) {
       style={{ flex: 1, backgroundColor: "#000" }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Stack.Screen
-        options={{
-          headerShown: false,
-          animation: 'fade',
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false, animation: "fade" }} />
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
@@ -68,15 +82,25 @@ export default function LoginView({ setView }: Props) {
             style={styles.input}
           />
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginText}>Login</Text>
+          <TouchableOpacity
+            style={[styles.loginButton, loading && { opacity: 0.6 }]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={styles.loginText}>Login</Text>
+            )}
           </TouchableOpacity>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Don’t have an account? </Text>
-          <TouchableOpacity onPress={() => router.push("/login-and-authetication/signup")}>
+          <Text style={styles.footerText}>Don't have an account? </Text>
+          <TouchableOpacity
+            onPress={() => router.push("/login-and-authetication/signup")}
+          >
             <Text style={styles.signupText}>Sign up</Text>
           </TouchableOpacity>
         </View>
@@ -92,27 +116,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#000",
   },
-  header: {
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  title: {
-    color: "#fff",
-    fontSize: 28,
-    fontWeight: "800",
-  },
-  subtitle: {
-    color: "#9ca3af",
-    fontSize: 14,
-    marginTop: 4,
-    textAlign: "center",
-  },
+  header: { alignItems: "center", marginBottom: 40 },
+  title: { color: "#fff", fontSize: 28, fontWeight: "800" },
+  subtitle: { color: "#9ca3af", fontSize: 14, marginTop: 4, textAlign: "center" },
   form: {},
-  label: {
-    color: "#9ca3af",
-    fontSize: 12,
-    fontWeight: "500",
-  },
+  label: { color: "#9ca3af", fontSize: 12, fontWeight: "500" },
   input: {
     backgroundColor: "#111827",
     borderColor: "#27272a",
@@ -134,23 +142,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 15,
   },
-  loginText: {
-    color: "#000",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 40,
-  },
-  footerText: {
-    color: "#9ca3af",
-    fontSize: 14,
-  },
-  signupText: {
-    color: "#84cc16",
-    fontWeight: "600",
-    fontSize: 14,
-  },
+  loginText: { color: "#000", fontWeight: "700", fontSize: 16 },
+  footer: { flexDirection: "row", justifyContent: "center", marginTop: 40 },
+  footerText: { color: "#9ca3af", fontSize: 14 },
+  signupText: { color: "#84cc16", fontWeight: "600", fontSize: 14 },
 });

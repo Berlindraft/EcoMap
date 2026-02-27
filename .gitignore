@@ -42,6 +42,14 @@ yarn-error.log*
 # Vite
 *.tsbuildinfo
 
+# Secrets / Credentials
+serviceAccountKey.json
+*-firebase-adminsdk*.json
+
+# Python
+__pycache__/
+*.pyc
+
 # AI Agent
 .agent/
 .expo/
