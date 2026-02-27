@@ -97,6 +97,7 @@ class ReportCreate(BaseModel):
     image_url: str
     geo_lat: float
     geo_lng: float
+    heading: Optional[float] = None  # compass heading (0-360) the user was facing
     waste_type: str = "mixed"
     severity: str = "medium"
     ai_confidence: float = 0.0
@@ -108,6 +109,7 @@ class ReportOut(BaseModel):
     image_url: str = ""
     geo_lat: float = 0.0
     geo_lng: float = 0.0
+    heading: Optional[float] = None
     waste_type: str = "mixed"
     severity: str = "medium"
     ai_confidence: float = 0.0
@@ -203,3 +205,29 @@ class AIAnalysisResult(BaseModel):
     severity: str
     confidence: float
     action: str
+
+
+# ──────────────────────────────────────
+# Object Detection (Bounding Boxes)
+# ──────────────────────────────────────
+
+class DetectionBox(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+    class_name: str
+    confidence: float
+    waste_type: str
+    color: str  # hex color for the bounding box
+
+class DetectionSummary(BaseModel):
+    total_count: int
+    waste_type: str
+    severity: str
+
+class DetectionResult(BaseModel):
+    detections: list[DetectionBox]
+    summary: DetectionSummary
+    image_width: int = 0
+    image_height: int = 0

@@ -30,3 +30,7 @@ cloudinary.config(
 
 # --- Roboflow ---
 ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY", "")
+ROBOFLOW_WORKSPACE = os.getenv("ROBOFLOW_WORKSPACE", "raymunds-workspace")
+ROBOFLOW_WORKFLOW_ID = os.getenv("ROBOFLOW_WORKFLOW_ID", "detect-count-and-visualize-2")
+
+

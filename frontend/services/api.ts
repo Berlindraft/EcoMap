@@ -15,7 +15,7 @@ const API_BASE_URL =
 async function request(path: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}/api${path}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout (Roboflow workflow + tunnel latency)
 
   try {
     const res = await fetch(url, {
@@ -81,6 +81,7 @@ export async function submitReport(data: {
   image_url: string;
   geo_lat: number;
   geo_lng: number;
+  heading?: number;
   waste_type: string;
   severity: string;
   ai_confidence: number;
@@ -157,6 +158,13 @@ export async function uploadImage(fileUri: string) {
 
 export async function analyzeWaste(imageBase64: string) {
   return request("/analyze", {
+    method: "POST",
+    body: JSON.stringify({ image_base64: imageBase64 }),
+  });
+}
+
+export async function detectObjects(imageBase64: string) {
+  return request("/detect", {
     method: "POST",
     body: JSON.stringify({ image_base64: imageBase64 }),
   });

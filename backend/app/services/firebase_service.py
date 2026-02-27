@@ -64,6 +64,7 @@ def create_report(data: dict) -> dict:
         "image_url": data.get("image_url", ""),
         "geo_lat": data.get("geo_lat", 0.0),
         "geo_lng": data.get("geo_lng", 0.0),
+        "heading": data.get("heading"),  # compass heading (degrees) user was facing
         "waste_type": data.get("waste_type", "mixed"),
         "severity": data.get("severity", "medium"),
         "ai_confidence": data.get("ai_confidence", 0.0),

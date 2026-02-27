@@ -8,12 +8,13 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { Marker, PROVIDER_GOOGLE, Heatmap } from "react-native-maps";
 import { fetchReports } from "../../services/api";
 
-const { width, height } = Dimensions.get("window");
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 type Report = {
   report_id: string;
@@ -23,13 +24,71 @@ type Report = {
   description: string;
   severity: string;
   status: string;
+  image_url?: string;
+  heading?: number | null;
+  ai_confidence?: number;
+  created_at?: string;
 };
+
+// Severity levels in ascending order
+const SEV_LEVELS = ["low", "medium", "high", "critical"] as const;
+
+/** Haversine distance in meters between two lat/lng points */
+function haversineMeters(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number,
+): number {
+  const R = 6_371_000; // Earth radius in meters
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * For each report, count how many other reports are within `radius` meters.
+ * If the count >= `threshold`, bump the severity up one level.
+ * Returns a map of report_id → effective severity.
+ */
+function computeEffectiveSeverity(
+  reports: Report[],
+  radius: number = 20,
+  threshold: number = 10,
+): Map<string, string> {
+  const result = new Map<string, string>();
+  for (let i = 0; i < reports.length; i++) {
+    const r = reports[i];
+    let nearby = 0;
+    for (let j = 0; j < reports.length; j++) {
+      if (i === j) continue;
+      const dist = haversineMeters(r.geo_lat, r.geo_lng, reports[j].geo_lat, reports[j].geo_lng);
+      if (dist <= radius) nearby++;
+    }
+    const baseIdx = SEV_LEVELS.indexOf(r.severity?.toLowerCase() as any);
+    const idx = baseIdx >= 0 ? baseIdx : 0;
+    const effective = nearby >= threshold
+      ? SEV_LEVELS[Math.min(idx + 1, SEV_LEVELS.length - 1)]
+      : SEV_LEVELS[idx];
+    result.set(r.report_id, effective);
+  }
+  return result;
+}
 
 export default function MapScreen() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [selected, setSelected] = useState<Report | null>(null);
   const mapRef = useRef<MapView>(null);
+
+  // Pre-compute density-adjusted severity for every report
+  const severityMap = React.useMemo(
+    () => computeEffectiveSeverity(reports, 20, 10),
+    [reports],
+  );
 
   const region = {
     latitude: 10.3157,
@@ -55,15 +114,16 @@ export default function MapScreen() {
     loadReports();
   }, [activeFilter]);
 
-  const getMarkerColor = (severity: string) => {
+  const getPinColor = (severity: string) => {
     switch (severity?.toLowerCase()) {
       case "critical":
+        return "#dc2626";
       case "high":
-        return "red";
+        return "#ef4444";
       case "medium":
-        return "orange";
+        return "#f97316";
       default:
-        return "green";
+        return "#84cc16";
     }
   };
 
@@ -128,33 +188,40 @@ export default function MapScreen() {
         provider={PROVIDER_GOOGLE}
         initialRegion={region}
         customMapStyle={darkMapStyle}
+        onPress={() => setSelected(null)}
       >
-        {reports.map((r) => (
-          <Marker
-            key={r.report_id}
-            coordinate={{ latitude: r.geo_lat, longitude: r.geo_lng }}
-            title={`${r.waste_type?.charAt(0).toUpperCase() + r.waste_type?.slice(1)} Waste`}
-            description={`Severity: ${r.severity}\n${r.description || ""}`}
-            pinColor={getMarkerColor(r.severity)}
-          />
-        ))}
+        {reports.map((r) => {
+          const eff = severityMap.get(r.report_id) || r.severity;
+          const color = getPinColor(eff);
+          return (
+            <Marker
+              key={r.report_id}
+              coordinate={{ latitude: r.geo_lat, longitude: r.geo_lng }}
+              pinColor={color}
+              onPress={() => setSelected(r)}
+            />
+          );
+        })}
 
         {reports.length > 0 && (
           <Heatmap
-            points={reports.map((r) => ({
-              latitude: r.geo_lat,
-              longitude: r.geo_lng,
-              weight:
-                r.severity === "critical"
-                  ? 1
-                  : r.severity === "high"
-                  ? 0.8
-                  : r.severity === "medium"
-                  ? 0.5
-                  : 0.3,
-            }))}
+            points={reports.map((r) => {
+              const eff = severityMap.get(r.report_id) || r.severity;
+              return {
+                latitude: r.geo_lat,
+                longitude: r.geo_lng,
+                weight:
+                  eff === "critical"
+                    ? 1
+                    : eff === "high"
+                    ? 0.8
+                    : eff === "medium"
+                    ? 0.5
+                    : 0.3,
+              };
+            })}
             radius={50}
-            opacity={0.6}
+            opacity={0.15}
             gradient={{
               colors: ["blue", "lime", "red"],
               startPoints: [0.1, 0.4, 1],
@@ -202,10 +269,69 @@ export default function MapScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Report count badge */}
+      {/* Report count */}
       <View style={styles.countBadge}>
         <Text style={styles.countText}>{reports.length} reports</Text>
       </View>
+
+      {/* Detail card when a pin is tapped */}
+      {selected && (
+        <View style={styles.detailCard}>
+          <TouchableOpacity style={styles.detailClose} onPress={() => setSelected(null)}>
+            <Ionicons name="close" size={20} color="#aaa" />
+          </TouchableOpacity>
+
+          {selected.image_url ? (
+            <Image
+              source={{ uri: selected.image_url }}
+              style={styles.detailImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.detailNoImage}>
+              <Ionicons name="image-outline" size={32} color="#555" />
+              <Text style={styles.detailNoImageText}>No photo</Text>
+            </View>
+          )}
+
+          <View style={styles.detailBody}>
+            <Text style={styles.detailTitle}>
+              {selected.waste_type?.charAt(0).toUpperCase() + selected.waste_type?.slice(1)} Waste
+            </Text>
+
+            <View style={styles.detailRow}>
+              <View style={[styles.severityDot, { backgroundColor: getPinColor(severityMap.get(selected.report_id) || selected.severity) }]} />
+              <Text style={styles.detailSeverity}>
+                {(severityMap.get(selected.report_id) || selected.severity)?.charAt(0).toUpperCase() +
+                  (severityMap.get(selected.report_id) || selected.severity)?.slice(1)}
+              </Text>
+              {selected.ai_confidence != null && (
+                <Text style={styles.detailConf}>
+                  {Math.round((selected.ai_confidence || 0) * 100)}% confidence
+                </Text>
+              )}
+            </View>
+
+            {selected.description ? (
+              <Text style={styles.detailDesc} numberOfLines={3}>
+                {selected.description}
+              </Text>
+            ) : null}
+
+            <View style={styles.detailFooter}>
+              <Text style={[styles.detailStatus, { color: getPinColor(severityMap.get(selected.report_id) || selected.severity) }]}>
+                {selected.status?.toUpperCase()}
+              </Text>
+              {selected.heading != null && (
+                <View style={styles.headingBadge}>
+                  <Ionicons name="compass-outline" size={12} color="#84cc16" />
+                  <Text style={styles.headingText}>{Math.round(selected.heading)}°</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -227,7 +353,9 @@ const darkMapStyle = [
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  map: { width, height },
+  map: { width: SCREEN_W, height: SCREEN_H },
+
+  // ─── Filters ────────────────────────
   filtersContainer: {
     position: "absolute",
     top: 60,
@@ -253,8 +381,6 @@ const styles = StyleSheet.create({
   filterText: { color: "#9ca3af", fontSize: 12, fontWeight: "700" },
   activeFilter: { backgroundColor: "#84cc16" },
   filterTextActive: { color: "#000", fontSize: 12, fontWeight: "700" },
-  webContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
-  webText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   loadingOverlay: {
     position: "absolute",
     top: 120,
@@ -291,4 +417,111 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#3f3f46",
   },
+
+  // ─── Detail card ────────────────────
+  detailCard: {
+    position: "absolute",
+    bottom: 100,
+    left: 16,
+    right: 16,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 10,
+  },
+  detailClose: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    zIndex: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  detailImage: {
+    width: "100%",
+    height: 140,
+  },
+  detailNoImage: {
+    width: "100%",
+    height: 80,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#222",
+  },
+  detailNoImageText: {
+    color: "#555",
+    fontSize: 11,
+    marginTop: 4,
+  },
+  detailBody: {
+    padding: 14,
+  },
+  detailTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  severityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  detailSeverity: {
+    color: "#ccc",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  detailConf: {
+    color: "#84cc16",
+    fontSize: 12,
+    fontWeight: "600",
+    marginLeft: "auto",
+  },
+  detailDesc: {
+    color: "#999",
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 8,
+  },
+  detailFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  detailStatus: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  headingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(132,204,22,0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  headingText: {
+    color: "#84cc16",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  webContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
+  webText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

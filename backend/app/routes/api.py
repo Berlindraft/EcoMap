@@ -7,11 +7,11 @@ from app.models.schemas import (
     ReportCreate, ReportOut,
     JobCreate, JobOut, JobApplicationCreate, JobApplicationOut,
     RewardOut, RedemptionCreate, RedemptionOut,
-    EcoPointsOut, AIAnalysisResult,
+    EcoPointsOut, AIAnalysisResult, DetectionResult,
 )
 from app.services import firebase_service as fs
 from app.services.cloudinary_service import upload_image
-from app.services.inference import analyze_image
+from app.services.inference import analyze_image, detect_objects
 
 router = APIRouter(prefix="/api")
 
@@ -145,4 +145,11 @@ async def upload_image_endpoint(file: UploadFile = File(...)):
 async def analyze_waste(image_base64: str = Body(..., embed=True)):
     """Analyze a base64-encoded image for waste classification."""
     result = await analyze_image(image_base64)
+    return result
+
+
+@router.post("/detect", response_model=DetectionResult)
+async def detect_waste(image_base64: str = Body(..., embed=True)):
+    """Detect waste objects and return bounding boxes for overlay rendering."""
+    result = await detect_objects(image_base64)
     return result
