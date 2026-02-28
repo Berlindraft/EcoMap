@@ -120,6 +120,32 @@ export async function fetchRewards() {
   return request("/rewards");
 }
 
+export async function createReward(data: {
+  name: string;
+  description?: string;
+  points_required: number;
+  stock: number;
+  icon?: string;
+  partner_name?: string;
+  partner_id?: string;
+}) {
+  return request("/rewards", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateReward(rewardId: string, data: Record<string, any>) {
+  return request(`/rewards/${rewardId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteReward(rewardId: string) {
+  return request(`/rewards/${rewardId}`, { method: "DELETE" });
+}
+
 export async function redeemReward(userId: string, rewardId: string) {
   return request("/rewards/redeem", {
     method: "POST",
@@ -168,4 +194,77 @@ export async function detectObjects(imageBase64: string) {
     method: "POST",
     body: JSON.stringify({ image_base64: imageBase64 }),
   });
+}
+
+// ─── Cleanup Verification ─────────────
+
+export async function verifyCleanup(
+  reportId: string,
+  userId: string,
+  imageBase64: string,
+): Promise<{
+  success: boolean;
+  waste_detected: number;
+  message: string;
+  points_awarded: number;
+  cleanup_image_url: string;
+}> {
+  return request(`/reports/${reportId}/cleanup`, {
+    method: "POST",
+    body: JSON.stringify({
+      report_id: reportId,
+      user_id: userId,
+      image_base64: imageBase64,
+    }),
+  });
+}
+
+// ─── Dashboard ────────────────────────
+
+export async function fetchDashboardStats() {
+  return request("/dashboard/stats");
+}
+
+// ─── Admin: User Management ───────────
+
+export async function fetchAllUsers() {
+  return request("/admin/users");
+}
+
+export async function updateUserRole(uid: string, role: string) {
+  return request(`/admin/users/${uid}/role`, {
+    method: "PUT",
+    body: JSON.stringify({ role }),
+  });
+}
+
+// ─── Partner Products ─────────────────
+
+export async function fetchProducts(partnerId?: string) {
+  const qs = partnerId ? `?partner_id=${partnerId}` : "";
+  return request(`/products${qs}`);
+}
+
+export async function createProduct(data: {
+  partner_id: string;
+  name: string;
+  description?: string;
+  price?: number;
+  points_price?: number;
+  category?: string;
+  stock?: number;
+  image_url?: string;
+}) {
+  return request("/products", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateProduct(productId: string, data: Record<string, any>) {
+  return request(`/products/${productId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteProduct(productId: string) {
+  return request(`/products/${productId}`, { method: "DELETE" });
 }

@@ -118,14 +118,14 @@ export default function JobsScreen() {
     <View style={{ flex: 1 }}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#84cc16" />}
       >
         <Text style={styles.title}>TrashCare Jobs</Text>
         <Text style={styles.subtitle}>Earn income or points by helping out.</Text>
 
         {jobs.length === 0 ? (
-          <View style={{ alignItems: "center", marginTop: 40 }}>
+          <View style={{ alignItems: "center", marginTop: 40, marginBottom: 30 }}>
             <Ionicons name="briefcase-outline" size={48} color="#3f3f46" />
             <Text style={{ color: "#9ca3af", marginTop: 12 }}>No jobs available yet.</Text>
           </View>

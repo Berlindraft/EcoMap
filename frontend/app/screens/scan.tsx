@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -21,6 +20,7 @@ import {
   submitReport,
   detectObjects,
 } from "../../services/api";
+import ResultModal from "../../components/ResultModal";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -80,20 +80,34 @@ export default function ScanScreen() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [heading, setHeading] = useState<number | null>(null);
 
-  // Request location permissions on mount
+  // Result modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalData, setModalData] = useState<{
+    success: boolean;
+    title: string;
+    message: string;
+    detail?: string;
+    detailIcon?: string;
+  }>({ success: false, title: "", message: "" });
+
+  // Continuously watch location so mocked / changing positions are picked up
   useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        setLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, distanceInterval: 1, timeInterval: 2000 },
+          (loc) => {
+            setLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+          },
+        );
       } catch {
         setLocation({ lat: 10.3157, lng: 123.8854 });
       }
     })();
+    return () => { sub?.remove(); };
   }, []);
 
   // ─── Scan button → detect + freeze + analyze ─────
@@ -212,13 +226,34 @@ export default function ScanScreen() {
       });
 
       await refreshProfile();
-      Alert.alert(
-        "Report Submitted! 🎉",
-        `+50 eco-points earned!\nWaste type: ${analysis.waste_type}\nSeverity: ${analysis.severity}`,
-        [{ text: "OK", onPress: resetToLive }]
-      );
-    } catch (err) {
-      Alert.alert("Error", "Failed to submit report. Please try again.");
+      setModalData({
+        success: true,
+        title: "Report Submitted!",
+        message: `Waste type: ${analysis.waste_type} · Severity: ${analysis.severity}`,
+        detail: "+50 Eco-Points",
+        detailIcon: "leaf",
+      });
+      setModalVisible(true);
+    } catch (err: any) {
+      // Handle cooldown / rate-limit (HTTP 429)
+      const msg = err?.message || "";
+      if (msg.includes("429")) {
+        const match = msg.match(/"detail"\s*:\s*"([^"]+)"/);
+        const detail = match ? match[1] : "Please wait before submitting another report.";
+        setModalData({
+          success: false,
+          title: "Cooldown Active",
+          message: detail,
+          detailIcon: "time",
+        });
+      } else {
+        setModalData({
+          success: false,
+          title: "Submission Failed",
+          message: "Failed to submit report. Please try again.",
+        });
+      }
+      setModalVisible(true);
       console.log("Submit error:", err);
     } finally {
       setSubmitting(false);
@@ -420,6 +455,19 @@ export default function ScanScreen() {
             </>
           )}
         </TouchableOpacity>
+
+        <ResultModal
+          visible={modalVisible}
+          success={modalData.success}
+          title={modalData.title}
+          message={modalData.message}
+          detail={modalData.detail}
+          detailIcon={modalData.detailIcon as any}
+          onDismiss={() => {
+            setModalVisible(false);
+            if (modalData.success) resetToLive();
+          }}
+        />
       </ScrollView>
     );
   }
@@ -467,7 +515,7 @@ export default function ScanScreen() {
       <View style={styles.scanButtonContainer}>
         <TouchableOpacity style={styles.scanButton} onPress={handleScan}>
           <View style={styles.scanButtonInner}>
-            <Ionicons name="scan-circle" size={32} color="#000" />
+            <Ionicons name="scan-circle" size={50} color="#000" />
           </View>
         </TouchableOpacity>
         <Text style={styles.scanLabel}>SCAN</Text>
@@ -568,7 +616,7 @@ const styles = StyleSheet.create({
   // ─── Scan button ────────────────────
   scanButtonContainer: {
     position: "absolute",
-    bottom: 110,
+    bottom: 120,
     alignSelf: "center",
     alignItems: "center",
   },

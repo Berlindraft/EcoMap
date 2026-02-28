@@ -33,4 +33,10 @@ ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY", "")
 ROBOFLOW_WORKSPACE = os.getenv("ROBOFLOW_WORKSPACE", "raymunds-workspace")
 ROBOFLOW_WORKFLOW_ID = os.getenv("ROBOFLOW_WORKFLOW_ID", "detect-count-and-visualize-2")
 
+# --- Report Cooldown ---
+# Minimum hours between reports from the same user (globally) and
+# between any reports within REPORT_RADIUS_METERS of each other.
+REPORT_COOLDOWN_HOURS = float(os.getenv("REPORT_COOLDOWN_HOURS", "4"))
+REPORT_RADIUS_METERS = float(os.getenv("REPORT_RADIUS_METERS", "10"))
+
 

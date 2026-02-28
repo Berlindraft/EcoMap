@@ -329,3 +329,46 @@ async def detect_objects(image_base64: str) -> dict:
             "image_width": 0,
             "image_height": 0,
         }
+
+
+# ── Cleanup Verification ────────────────
+
+# Cleanup verification tuning
+CLEANUP_CONFIDENCE = 0.55   # ignore detections below this confidence
+CLEANUP_THRESHOLD = 5       # allow up to this many low-noise detections
+
+
+async def verify_cleanup(image_base64: str) -> dict:
+    """Verify a cleanup by running waste detection on the 'after' photo.
+    If very few (or zero) waste items are detected, the cleanup is accepted.
+    Returns {verified: bool, waste_detected: int, message: str}.
+    """
+    try:
+        predictions, _ = await _call_roboflow(image_base64)
+        # Only count high-confidence detections to avoid false positives on clean areas
+        confident = [p for p in predictions if p.get("confidence", 0) >= CLEANUP_CONFIDENCE]
+        count = len(confident)
+        print(f"[Cleanup] Raw predictions: {len(predictions)}, above {CLEANUP_CONFIDENCE}: {count}")
+
+        if count <= CLEANUP_THRESHOLD:
+            return {
+                "verified": True,
+                "waste_detected": count,
+                "message": "Area verified as cleaned! Great job!" if count == 0
+                    else f"Only {count} small item(s) remaining — cleanup accepted. Nice work!",
+            }
+        else:
+            return {
+                "verified": False,
+                "waste_detected": count,
+                "message": f"Still {count} waste item(s) detected. Please clean the area more thoroughly and try again.",
+            }
+
+    except Exception as e:
+        print(f"[Cleanup Verify Error] {e}")
+        import traceback; traceback.print_exc()
+        return {
+            "verified": False,
+            "waste_detected": -1,
+            "message": "AI verification unavailable. Please try again later.",
+        }

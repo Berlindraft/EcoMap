@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,14 +9,49 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
-import { fetchReports, fetchUserReports } from "../../services/api";
+import { useDataCache } from "../../contexts/DataCache";
 
 const { width } = Dimensions.get("window");
+const AD_WIDTH = width - 32;
+const AD_HEIGHT = 70;
+
+// ── Ad data (replace with real ads / fetch from backend later) ──
+const ADS = [
+  {
+    id: "1",
+    gradient: ["#84cc16", "#15803d"] as [string, string],
+    icon: "leaf" as const,
+    title: "Go Green with EcoMap!",
+    subtitle: "Earn points for every cleanup report you submit.",
+  },
+  {
+    id: "2",
+    gradient: ["#3b82f6", "#1e40af"] as [string, string],
+    icon: "gift" as const,
+    title: "Redeem Eco-Rewards",
+    subtitle: "Use your points for discounts at partner stores.",
+  },
+  {
+    id: "3",
+    gradient: ["#f97316", "#c2410c"] as [string, string],
+    icon: "briefcase" as const,
+    title: "TrashCare Jobs",
+    subtitle: "Help your community and earn income or points.",
+  },
+  {
+    id: "4",
+    gradient: ["#ec4899", "#9d174d"] as [string, string],
+    icon: "people" as const,
+    title: "Invite Friends",
+    subtitle: "Grow the EcoMap community in Cebu!",
+  },
+];
 
 type Report = {
   report_id: string;
@@ -32,36 +67,27 @@ type Report = {
 
 export default function HomeScreen() {
   const { profile, refreshProfile, logout } = useAuth();
-  const [reports, setReports] = useState<Report[]>([]);
-  const [userReportCount, setUserReportCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { reports, userReports, reportsLoading, refreshReports } = useDataCache();
   const [refreshing, setRefreshing] = useState(false);
+  const [activeAd, setActiveAd] = useState(0);
+  const adRef = useRef<FlatList>(null);
 
-  const loadData = useCallback(async () => {
-    try {
-      await refreshProfile();
-      const allReports = await fetchReports({ limit: 10 });
-      setReports(allReports);
-
-      if (profile?.uid) {
-        const myReports = await fetchUserReports(profile.uid);
-        setUserReportCount(myReports.length);
-      }
-    } catch (err) {
-      console.log("Error loading home data:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [profile?.uid]);
-
+  // Auto-scroll ads every 4 seconds
   useEffect(() => {
-    loadData();
+    const timer = setInterval(() => {
+      setActiveAd((prev) => {
+        const next = (prev + 1) % ADS.length;
+        adRef.current?.scrollToIndex({ index: next, animated: true });
+        return next;
+      });
+    }, 4000);
+    return () => clearInterval(timer);
   }, []);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadData();
+    await Promise.all([refreshReports(), refreshProfile()]);
+    setRefreshing(false);
   };
 
   const timeAgo = (dateStr: string) => {
@@ -116,7 +142,7 @@ export default function HomeScreen() {
     );
   };
 
-  if (loading) {
+  if (reportsLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: "#000", justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#84cc16" />
@@ -137,8 +163,8 @@ export default function HomeScreen() {
               <Text style={styles.dashboardText}>DASHBOARD</Text>
               <Text style={styles.helloText}>Hello, {userName}! 👋</Text>
             </View>
-            <TouchableOpacity onPress={logout} style={styles.dashboardButton}>
-              <Ionicons name="log-out-outline" size={24} color="#fff" />
+            <TouchableOpacity onPress={() => router.push("/screens/profile" as any)} style={styles.dashboardButton}>
+              <Ionicons name="person-circle-outline" size={28} color="#84cc16" />
             </TouchableOpacity>
           </View>
 
@@ -179,6 +205,56 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </LinearGradient>
+
+          {/* ── Ad Carousel ── */}
+          <View>
+            <FlatList
+              ref={adRef}
+              data={ADS}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={AD_WIDTH + 12}
+              decelerationRate="fast"
+              contentContainerStyle={{ gap: 12 }}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / (AD_WIDTH + 12));
+                setActiveAd(idx);
+              }}
+              renderItem={({ item }) => (
+                <LinearGradient
+                  colors={item.gradient}
+                  start={[0, 0]}
+                  end={[1, 1]}
+                  style={styles.adCard}
+                >
+                  <View style={styles.adContent}>
+                    <View style={styles.adIconWrap}>
+                      <Ionicons name={item.icon} size={28} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.adBadge}>ADVERTISEMENT</Text>
+                      <Text style={styles.adTitle}>{item.title}</Text>
+                      <Text style={styles.adSubtitle}>{item.subtitle}</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              )}
+            />
+            {/* Dot indicators */}
+            <View style={styles.adDots}>
+              {ADS.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.adDot,
+                    i === activeAd && styles.adDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* Quick Stats */}
@@ -187,10 +263,10 @@ export default function HomeScreen() {
             <Ionicons
               name="checkmark-circle-outline"
               size={100}
-              color="rgba(132,204,22,0.1)"
+              color="rgba(132,204,22)"
               style={styles.statBackgroundIcon}
             />
-            <Text style={styles.statValue}>{userReportCount}</Text>
+            <Text style={styles.statValue}>{userReports.length}</Text>
             <Text style={styles.statLabel}>My Reports</Text>
           </View>
 
@@ -198,7 +274,7 @@ export default function HomeScreen() {
             <Ionicons
               name="leaf-outline"
               size={100}
-              color="rgba(132,204,22,0.1)"
+              color="rgba(132,204,22)"
               style={styles.statBackgroundIcon}
             />
             <Text style={styles.statValue}>{points}</Text>
@@ -224,7 +300,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={reports}
+            data={reports.slice(0, 3)}
             keyExtractor={(item) => item.report_id}
             renderItem={renderReport}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
@@ -301,6 +377,64 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   reportText: { color: "#000", fontWeight: "700" },
+
+  // Ad carousel
+  adCard: {
+    width: AD_WIDTH,
+    height: AD_HEIGHT,
+    borderRadius: 20,
+    padding: 16,
+    justifyContent: "center",
+  },
+  adContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  adIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  adBadge: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.6)",
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  adTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#fff",
+    marginBottom: 2,
+  },
+  adSubtitle: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.8)",
+    lineHeight: 15,
+  },
+  adDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  adDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#3f3f46",
+  },
+  adDotActive: {
+    backgroundColor: "#84cc16",
+    width: 18,
+  },
+
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",

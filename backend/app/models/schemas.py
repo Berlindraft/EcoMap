@@ -50,6 +50,11 @@ class RedemptionStatus(str, Enum):
     claimed = "claimed"
     expired = "expired"
 
+class UserRole(str, Enum):
+    user = "user"
+    partner = "partner"
+    admin = "admin"
+
 class EcoAction(str, Enum):
     report = "report"
     cleanup = "cleanup"
@@ -76,6 +81,9 @@ class UserUpdate(BaseModel):
     barangay: Optional[str] = None
     city: Optional[str] = None
 
+class UserRoleUpdate(BaseModel):
+    role: str  # "user", "partner", "admin"
+
 class UserOut(BaseModel):
     uid: str
     full_name: str
@@ -84,6 +92,7 @@ class UserOut(BaseModel):
     profile_photo: str = ""
     barangay: str = ""
     city: str = "Cebu City"
+    role: str = "user"
     eco_points_balance: int = 0
     created_at: Optional[str] = None
 
@@ -169,6 +178,24 @@ class RewardOut(BaseModel):
     stock: int = 0
     icon: str = ""
     partner_name: str = ""
+    partner_id: str = ""
+
+class RewardCreate(BaseModel):
+    name: str
+    description: str = ""
+    points_required: int = 0
+    stock: int = 0
+    icon: str = "🎁"
+    partner_name: str = "EcoMap"
+    partner_id: str = ""
+
+class RewardUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    points_required: Optional[int] = None
+    stock: Optional[int] = None
+    icon: Optional[str] = None
+    partner_name: Optional[str] = None
 
 class RedemptionCreate(BaseModel):
     user_id: str
@@ -211,6 +238,23 @@ class AIAnalysisResult(BaseModel):
 # Object Detection (Bounding Boxes)
 # ──────────────────────────────────────
 
+# ──────────────────────────────────────
+# Cleanup Verification
+# ──────────────────────────────────────
+
+class CleanupVerifyRequest(BaseModel):
+    report_id: str
+    user_id: str
+    image_base64: str  # photo of the cleaned-up area
+
+class CleanupVerifyResult(BaseModel):
+    success: bool
+    waste_detected: int = 0
+    message: str = ""
+    points_awarded: int = 0
+    cleanup_image_url: str = ""
+
+
 class DetectionBox(BaseModel):
     x: float
     y: float
@@ -231,3 +275,56 @@ class DetectionResult(BaseModel):
     summary: DetectionSummary
     image_width: int = 0
     image_height: int = 0
+
+
+# ──────────────────────────────────────
+# Partner Products
+# ──────────────────────────────────────
+
+class ProductCreate(BaseModel):
+    partner_id: str
+    name: str
+    description: str = ""
+    price: float = 0.0
+    points_price: int = 0  # eco-points price (0 = not redeemable with points)
+    category: str = "general"
+    stock: int = 0
+    image_url: str = ""
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    points_price: Optional[int] = None
+    category: Optional[str] = None
+    stock: Optional[int] = None
+    image_url: Optional[str] = None
+
+class ProductOut(BaseModel):
+    product_id: str
+    partner_id: str
+    partner_name: str = ""
+    name: str
+    description: str = ""
+    price: float = 0.0
+    points_price: int = 0
+    category: str = "general"
+    stock: int = 0
+    image_url: str = ""
+    created_at: Optional[str] = None
+
+
+# ──────────────────────────────────────
+# Dashboard Stats
+# ──────────────────────────────────────
+
+class DashboardStats(BaseModel):
+    total_users: int = 0
+    total_reports: int = 0
+    total_cleaned: int = 0
+    total_points_distributed: int = 0
+    total_rewards_redeemed: int = 0
+    total_jobs: int = 0
+    total_products: int = 0
+    recent_reports: list = []
+    recent_redemptions: list = []

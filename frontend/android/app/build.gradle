@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.frontend'
+    namespace 'com.anonymous.ecomap'
     defaultConfig {
-        applicationId 'com.anonymous.frontend'
+        applicationId 'com.anonymous.ecomap'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

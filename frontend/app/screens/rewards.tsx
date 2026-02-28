@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
-import { fetchRewards, redeemReward } from "../../services/api";
+import { redeemReward } from "../../services/api";
+import { useDataCache } from "../../contexts/DataCache";
+import ResultModal from "../../components/ResultModal";
 
 type Reward = {
   reward_id: string;
@@ -23,67 +25,66 @@ type Reward = {
   partner_name: string;
 };
 
-// Fallback rewards for when backend has no data yet
-const FALLBACK_REWARDS: Reward[] = [
-  { reward_id: "fb1", name: "Eco Bag", description: "Reusable shopping bag", points_required: 50, stock: 10, icon: "🛍️", partner_name: "EcoMap" },
-  { reward_id: "fb2", name: "Reusable Bottle", description: "BPA-free water bottle", points_required: 100, stock: 5, icon: "🥤", partner_name: "EcoMap" },
-  { reward_id: "fb3", name: "Plant Seed Pack", description: "Grow your own herbs", points_required: 75, stock: 20, icon: "🌱", partner_name: "EcoMap" },
-  { reward_id: "fb4", name: "Sticker Pack", description: "EcoMap stickers", points_required: 20, stock: 50, icon: "📦", partner_name: "EcoMap" },
-];
-
 export default function RewardsScreen() {
   const { profile, refreshProfile } = useAuth();
-  const [rewards, setRewards] = useState<Reward[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { rewards, rewardsLoading, refreshRewards } = useDataCache();
   const [refreshing, setRefreshing] = useState(false);
   const [redeeming, setRedeeming] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalData, setModalData] = useState<{
+    success: boolean;
+    title: string;
+    message: string;
+    detail?: string;
+    detailIcon?: string;
+  }>({ success: false, title: "", message: "" });
 
-  const loadRewards = useCallback(async () => {
-    try {
-      const data = await fetchRewards();
-      setRewards(data.length > 0 ? data : FALLBACK_REWARDS);
-    } catch {
-      setRewards(FALLBACK_REWARDS);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadRewards();
-  }, []);
-
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    refreshProfile();
-    loadRewards();
+    await Promise.all([refreshRewards(), refreshProfile()]);
+    setRefreshing(false);
   };
 
   const handleRedeem = async (reward: Reward) => {
     if (!profile?.uid) return;
 
-    const points = profile.eco_points_balance ?? 0;
-    if (points < reward.points_required) {
-      Alert.alert("Not Enough Points", `You need ${reward.points_required - points} more points.`);
+    const pts = profile.eco_points_balance ?? 0;
+    if (pts < reward.points_required) {
+      setModalData({
+        success: false,
+        title: "Not Enough Points",
+        message: `You need ${reward.points_required - pts} more eco-points to redeem this reward.`,
+        detail: `${pts} / ${reward.points_required} pts`,
+        detailIcon: "alert-circle",
+      });
+      setModalVisible(true);
       return;
     }
 
     setRedeeming(reward.reward_id);
     try {
+      // Try backend first
       const result = await redeemReward(profile.uid, reward.reward_id);
       await refreshProfile();
-      Alert.alert(
-        "Redeemed! 🎉",
-        `Show this code at the store:\n\n${result.code || "ECO-" + Math.floor(Math.random() * 10000)}`
-      );
-      loadRewards();
+      const code = result.code || `ECO-${Math.floor(Math.random() * 10000)}`;
+      setModalData({
+        success: true,
+        title: "Reward Redeemed!",
+        message: `Show this code to claim your ${reward.name}:`,
+        detail: code,
+        detailIcon: "gift",
+      });
+      setModalVisible(true);
+      refreshRewards();
     } catch {
-      // If backend doesn't have the reward (fallback mode), do local simulation
-      Alert.alert(
-        "Redeemed! 🎉",
-        `Show this code at the store:\n\nECO-${Math.floor(Math.random() * 10000)}`
-      );
+      // Backend rejected — show error instead of faking success
+      setModalData({
+        success: false,
+        title: "Redemption Failed",
+        message: "Could not redeem this reward. Please try again later.",
+        detailIcon: "alert-circle",
+      });
+      setModalVisible(true);
     } finally {
       setRedeeming(null);
     }
@@ -91,7 +92,7 @@ export default function RewardsScreen() {
 
   const points = profile?.eco_points_balance ?? 0;
 
-  if (loading) {
+  if (rewardsLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: "#000", justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#84cc16" />
@@ -129,6 +130,12 @@ export default function RewardsScreen() {
                 {item.description ? (
                   <Text style={styles.rewardDesc} numberOfLines={2}>{item.description}</Text>
                 ) : null}
+                {item.partner_name ? (
+                  <View style={styles.partnerBadge}>
+                    <Ionicons name="storefront-outline" size={10} color="#84cc16" />
+                    <Text style={styles.partnerText}>{item.partner_name}</Text>
+                  </View>
+                ) : null}
                 <Text style={styles.rewardCost}>{item.points_required} Pts</Text>
                 {item.stock <= 5 && item.stock > 0 && (
                   <Text style={styles.stockWarning}>{item.stock} left</Text>
@@ -163,6 +170,16 @@ export default function RewardsScreen() {
           })}
         </View>
       </ScrollView>
+
+      <ResultModal
+        visible={modalVisible}
+        success={modalData.success}
+        title={modalData.title}
+        message={modalData.message}
+        detail={modalData.detail}
+        detailIcon={modalData.detailIcon as any}
+        onDismiss={() => setModalVisible(false)}
+      />
     </View>
   );
 }
@@ -202,6 +219,17 @@ const styles = StyleSheet.create({
   rewardIcon: { fontSize: 36 },
   rewardName: { fontSize: 14, fontWeight: "700", color: "#fff", marginBottom: 4, textAlign: "center" },
   rewardDesc: { fontSize: 10, color: "#9ca3af", textAlign: "center", marginBottom: 4 },
+  partnerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(132,204,22,0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  partnerText: { fontSize: 9, color: "#84cc16", fontWeight: "600" },
   rewardCost: { fontSize: 12, fontWeight: "700", color: "#84cc16", marginBottom: 4 },
   stockWarning: { fontSize: 10, color: "#f97316", marginBottom: 4 },
   stockOut: { fontSize: 10, color: "#ef4444", marginBottom: 4 },

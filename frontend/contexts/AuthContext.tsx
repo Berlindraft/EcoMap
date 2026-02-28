@@ -19,6 +19,7 @@ interface UserProfile {
   profile_photo: string;
   barangay: string;
   city: string;
+  role: string;
   eco_points_balance: number;
 }
 

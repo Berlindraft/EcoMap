@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import "react-native-reanimated";
 import "../global.css";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
+import { DataCacheProvider } from "../contexts/DataCache";
 import { View, ActivityIndicator } from "react-native";
 
 function RootNavigator() {
@@ -47,7 +48,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <DataCacheProvider>
+        <RootNavigator />
+      </DataCacheProvider>
     </AuthProvider>
   );
 }

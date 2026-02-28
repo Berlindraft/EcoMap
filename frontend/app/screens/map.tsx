@@ -9,10 +9,15 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { Marker, PROVIDER_GOOGLE, Heatmap } from "react-native-maps";
-import { fetchReports } from "../../services/api";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Location from "expo-location";
+import { useAuth } from "../../contexts/AuthContext";
+import { fetchReports, verifyCleanup } from "../../services/api";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -78,24 +83,74 @@ function computeEffectiveSeverity(
 }
 
 export default function MapScreen() {
+  const { profile, refreshProfile } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
   const [selected, setSelected] = useState<Report | null>(null);
   const mapRef = useRef<MapView>(null);
 
-  // Pre-compute density-adjusted severity for every report
-  const severityMap = React.useMemo(
-    () => computeEffectiveSeverity(reports, 20, 10),
-    [reports],
-  );
+  // ─── Cleanup camera state ──────────
+  const [cleanupMode, setCleanupMode] = useState(false);
+  const [cleanupTarget, setCleanupTarget] = useState<Report | null>(null);
+  const [cleanupPhoto, setCleanupPhoto] = useState<string | null>(null); // base64
+  const [cleanupPhotoUri, setCleanupPhotoUri] = useState<string | null>(null);
+  const [cleanupVerifying, setCleanupVerifying] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<{ success: boolean; message: string; points: number } | null>(null);
+  const cleanupCamRef = useRef<CameraView>(null);
+  const [camPermission, requestCamPermission] = useCameraPermissions();
 
-  const region = {
+  // Fallback: Cebu City center
+  const FALLBACK_REGION = {
     latitude: 10.3157,
     longitude: 123.8854,
     latitudeDelta: 0.1,
     longitudeDelta: 0.1,
   };
+
+  const [region, setRegion] = useState(FALLBACK_REGION);
+
+  // Continuously watch user location so map + recenter stay accurate
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 3000 },
+          (pos) => {
+            const userRegion = {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            };
+            setRegion(userRegion);
+          },
+        );
+        // Also do an initial center animation
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const initRegion = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        };
+        setRegion(initRegion);
+        mapRef.current?.animateToRegion(initRegion, 600);
+      } catch (e) {
+        console.log("Could not get user location:", e);
+      }
+    })();
+    return () => { sub?.remove(); };
+  }, []);
+
+  // Pre-compute density-adjusted severity for every report
+  const severityMap = React.useMemo(
+    () => computeEffectiveSeverity(reports, 20, 10),
+    [reports],
+  );
 
   const loadReports = useCallback(async () => {
     try {
@@ -163,6 +218,77 @@ export default function MapScreen() {
     mapRef.current?.animateToRegion(region, 500);
   };
 
+  // Show user's blue dot on map
+  const showsUserLocation = true;
+
+  // ─── Cleanup handlers ──────────────
+  const startCleanup = async (report: Report) => {
+    if (!camPermission?.granted) {
+      const perm = await requestCamPermission();
+      if (!perm.granted) {
+        Alert.alert("Camera Required", "Camera permission is needed to verify cleanup.");
+        return;
+      }
+    }
+    setCleanupTarget(report);
+    setCleanupPhoto(null);
+    setCleanupPhotoUri(null);
+    setCleanupResult(null);
+    setCleanupMode(true);
+    setSelected(null);
+  };
+
+  const takeCleanupPhoto = async () => {
+    if (!cleanupCamRef.current) return;
+    try {
+      const photo = await cleanupCamRef.current.takePictureAsync({
+        base64: true,
+        quality: 0.85,
+      });
+      if (photo?.base64) {
+        setCleanupPhoto(photo.base64);
+        setCleanupPhotoUri(photo.uri);
+      }
+    } catch (e) {
+      console.log("Cleanup photo error:", e);
+    }
+  };
+
+  const submitCleanup = async () => {
+    if (!cleanupPhoto || !cleanupTarget || !profile) return;
+    setCleanupVerifying(true);
+    try {
+      const res = await verifyCleanup(cleanupTarget.report_id, profile.uid, cleanupPhoto);
+      setCleanupResult({
+        success: res.success,
+        message: res.message,
+        points: res.points_awarded || 0,
+      });
+      if (res.success) {
+        await refreshProfile();
+        // Reload reports so the pin updates to "cleaned" status
+        loadReports();
+      }
+    } catch (e: any) {
+      setCleanupResult({
+        success: false,
+        message: "Something went wrong. Please try again.",
+        points: 0,
+      });
+      console.log("Cleanup submit error:", e);
+    } finally {
+      setCleanupVerifying(false);
+    }
+  };
+
+  const closeCleanup = () => {
+    setCleanupMode(false);
+    setCleanupTarget(null);
+    setCleanupPhoto(null);
+    setCleanupPhotoUri(null);
+    setCleanupResult(null);
+  };
+
   const filters = [
     { key: "all", label: "All Waste" },
     { key: "plastic", label: "Plastics" },
@@ -186,8 +312,10 @@ export default function MapScreen() {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
-        initialRegion={region}
+        initialRegion={FALLBACK_REGION}
         customMapStyle={darkMapStyle}
+        showsUserLocation={showsUserLocation}
+        showsMyLocationButton={false}
         onPress={() => setSelected(null)}
       >
         {reports.map((r) => {
@@ -329,9 +457,130 @@ export default function MapScreen() {
                 </View>
               )}
             </View>
+
+            {/* Clean Up button — only for non-cleaned reports */}
+            {selected.status !== "cleaned" && (
+              <TouchableOpacity
+                style={styles.cleanupButton}
+                onPress={() => startCleanup(selected)}
+              >
+                <Ionicons name="sparkles" size={16} color="#000" />
+                <Text style={styles.cleanupButtonText}>Clean Up</Text>
+              </TouchableOpacity>
+            )}
+            {selected.status === "cleaned" && (
+              <View style={styles.cleanedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color="#84cc16" />
+                <Text style={styles.cleanedBadgeText}>Cleaned</Text>
+              </View>
+            )}
           </View>
         </View>
       )}
+
+      {/* ─── Cleanup Camera Modal ──────── */}
+      <Modal visible={cleanupMode} animationType="slide" statusBarTranslucent>
+        <View style={styles.cleanupModal}>
+          {/* Header */}
+          <View style={styles.cleanupHeader}>
+            <TouchableOpacity onPress={closeCleanup} style={styles.cleanupBackBtn}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.cleanupHeaderTitle}>Verify Cleanup</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* If we have a result, show it */}
+          {cleanupResult ? (
+            <View style={styles.cleanupResultContainer}>
+              {cleanupPhotoUri && (
+                <Image source={{ uri: cleanupPhotoUri }} style={styles.cleanupPreviewLarge} resizeMode="cover" />
+              )}
+              <View style={[styles.cleanupResultCard, cleanupResult.success ? styles.cleanupResultSuccess : styles.cleanupResultFail]}>
+                <Ionicons
+                  name={cleanupResult.success ? "checkmark-circle" : "close-circle"}
+                  size={48}
+                  color={cleanupResult.success ? "#84cc16" : "#ef4444"}
+                />
+                <Text style={styles.cleanupResultTitle}>
+                  {cleanupResult.success ? "Cleanup Verified!" : "Not Clean Enough"}
+                </Text>
+                <Text style={styles.cleanupResultMsg}>{cleanupResult.message}</Text>
+                {cleanupResult.success && cleanupResult.points > 0 && (
+                  <View style={styles.cleanupPointsBadge}>
+                    <Ionicons name="leaf" size={18} color="#84cc16" />
+                    <Text style={styles.cleanupPointsText}>+{cleanupResult.points} Eco-Points</Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={[styles.cleanupActionBtn, cleanupResult.success ? styles.cleanupDoneBtn : styles.cleanupRetryBtn]}
+                  onPress={() => {
+                    if (cleanupResult.success) {
+                      closeCleanup();
+                    } else {
+                      setCleanupPhoto(null);
+                      setCleanupPhotoUri(null);
+                      setCleanupResult(null);
+                    }
+                  }}
+                >
+                  <Text style={styles.cleanupActionBtnText}>
+                    {cleanupResult.success ? "Done" : "Retake Photo"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : cleanupPhoto && cleanupPhotoUri ? (
+            /* Photo preview before submitting */
+            <View style={styles.cleanupPreviewContainer}>
+              <Image source={{ uri: cleanupPhotoUri }} style={styles.cleanupPreviewLarge} resizeMode="cover" />
+              <Text style={styles.cleanupPreviewHint}>Does this area look clean?</Text>
+              <View style={styles.cleanupPreviewActions}>
+                <TouchableOpacity
+                  style={[styles.cleanupActionBtn, styles.cleanupRetryBtn]}
+                  onPress={() => { setCleanupPhoto(null); setCleanupPhotoUri(null); }}
+                >
+                  <Ionicons name="refresh" size={18} color="#fff" />
+                  <Text style={styles.cleanupActionBtnText}>Retake</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.cleanupActionBtn, styles.cleanupSubmitBtn]}
+                  onPress={submitCleanup}
+                  disabled={cleanupVerifying}
+                >
+                  {cleanupVerifying ? (
+                    <ActivityIndicator size="small" color="#000" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark" size={18} color="#000" />
+                      <Text style={[styles.cleanupActionBtnText, { color: "#000" }]}>Verify</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            /* Camera viewfinder */
+            <View style={styles.cleanupCameraContainer}>
+              <CameraView
+                ref={cleanupCamRef}
+                style={styles.cleanupCamera}
+                facing="back"
+              />
+              <View style={styles.cleanupCameraOverlay}>
+                <Text style={styles.cleanupInstructions}>
+                  Take a photo of the cleaned area
+                </Text>
+              </View>
+              <View style={styles.cleanupShutterRow}>
+                <TouchableOpacity style={styles.cleanupShutter} onPress={takeCleanupPhoto}>
+                  <View style={styles.cleanupShutterInner} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -392,7 +641,7 @@ const styles = StyleSheet.create({
   },
   countBadge: {
     position: "absolute",
-    bottom: 100,
+    bottom: 140,
     alignSelf: "center",
     backgroundColor: "rgba(39,39,42,0.9)",
     paddingHorizontal: 16,
@@ -522,6 +771,215 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
+
+  // ─── Clean Up button in detail card ──
+  cleanupButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#84cc16",
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  cleanupButtonText: {
+    color: "#000",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  cleanedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(132,204,22,0.15)",
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  cleanedBadgeText: {
+    color: "#84cc16",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  // ─── Cleanup modal ────────────────
+  cleanupModal: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  cleanupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: "#111",
+  },
+  cleanupBackBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cleanupHeaderTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  cleanupCameraContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  cleanupCamera: {
+    flex: 1,
+  },
+  cleanupCameraOverlay: {
+    position: "absolute",
+    top: 20,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  cleanupInstructions: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  cleanupShutterRow: {
+    position: "absolute",
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  cleanupShutter: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: "#84cc16",
+    padding: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cleanupShutterInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#84cc16",
+  },
+
+  // ─── Cleanup preview ─────────────
+  cleanupPreviewContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  cleanupPreviewLarge: {
+    width: SCREEN_W - 32,
+    height: SCREEN_H * 0.45,
+    borderRadius: 16,
+  },
+  cleanupPreviewHint: {
+    color: "#aaa",
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 16,
+    marginBottom: 20,
+  },
+  cleanupPreviewActions: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  cleanupActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 14,
+    minWidth: 130,
+    justifyContent: "center",
+  },
+  cleanupActionBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  cleanupRetryBtn: {
+    backgroundColor: "#333",
+  },
+  cleanupSubmitBtn: {
+    backgroundColor: "#84cc16",
+  },
+  cleanupDoneBtn: {
+    backgroundColor: "#84cc16",
+    marginTop: 16,
+  },
+
+  // ─── Cleanup result ──────────────
+  cleanupResultContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  cleanupResultCard: {
+    alignItems: "center",
+    padding: 24,
+    borderRadius: 20,
+    marginTop: 20,
+    width: SCREEN_W - 48,
+  },
+  cleanupResultSuccess: {
+    backgroundColor: "rgba(132,204,22,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(132,204,22,0.3)",
+  },
+  cleanupResultFail: {
+    backgroundColor: "rgba(239,68,68,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.3)",
+  },
+  cleanupResultTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "800",
+    marginTop: 12,
+  },
+  cleanupResultMsg: {
+    color: "#aaa",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 19,
+  },
+  cleanupPointsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 16,
+    backgroundColor: "rgba(132,204,22,0.2)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  cleanupPointsText: {
+    color: "#84cc16",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
   webContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
   webText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
