@@ -45,6 +45,8 @@ yarn-error.log*
 # Secrets / Credentials
 serviceAccountKey.json
 *-firebase-adminsdk*.json
+google-services.json
+firebase.js
 
 # Python
 __pycache__/
