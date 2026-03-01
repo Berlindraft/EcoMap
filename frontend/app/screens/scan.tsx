@@ -78,6 +78,31 @@ export default function ScanScreen() {
   // Staged progress
   const [scanStage, setScanStage] = useState<ScanStage>("idle");
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
+
+  // Start pulse + scan line when analyzing
+  useEffect(() => {
+    if (scanStage !== "idle" && scanStage !== "done") {
+      // Pulse ring
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.3, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        ])
+      ).start();
+      // Scan line sweep
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scanLineAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+          Animated.timing(scanLineAnim, { toValue: 0, duration: 2000, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+      scanLineAnim.setValue(0);
+    }
+  }, [scanStage]);
 
   // Camera photo dimensions (for display container aspect ratio)
   const [photoDims, setPhotoDims] = useState<{ w: number; h: number } | null>(null);
@@ -341,6 +366,103 @@ export default function ScanScreen() {
   const coverOffsetX = (imgW * coverScale - containerW) / 2;
   const coverOffsetY = (imgH * coverScale - containerH) / 2;
 
+  // ─── Full-screen loading screen ──────
+  const STAGES_ORDER: ScanStage[] = ["capturing", "uploading", "detecting", "classifying", "done"];
+
+  if (!isLive && frozenUri && scanStage !== "idle" && scanStage !== "done" && analyzing) {
+    return (
+      <View style={styles.loadingScreen}>
+        {/* Background frozen image, blurred */}
+        <Image source={{ uri: frozenUri }} style={styles.loadingBgImage} blurRadius={20} />
+        <View style={styles.loadingDarkOverlay} />
+
+        {/* Animated scan line */}
+        <Animated.View
+          style={[
+            styles.scanLine,
+            {
+              transform: [{
+                translateY: scanLineAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, SCREEN_H],
+                }),
+              }],
+            },
+          ]}
+        />
+
+        {/* Center content */}
+        <View style={styles.loadingCenter}>
+          {/* Pulsing ring */}
+          <Animated.View style={[styles.pulseRing, { transform: [{ scale: pulseAnim }] }]}>
+            <View style={styles.pulseInner}>
+              <Ionicons name="leaf" size={40} color="#84cc16" />
+            </View>
+          </Animated.View>
+
+          <Text style={styles.loadingTitle}>AI analyzing waste type...</Text>
+
+          {/* Stage steps */}
+          <View style={styles.stageSteps}>
+            {STAGES_ORDER.slice(0, 4).map((stage) => {
+              const stageIdx = STAGES_ORDER.indexOf(stage);
+              const currentIdx = STAGES_ORDER.indexOf(scanStage);
+              const isDone = stageIdx < currentIdx;
+              const isActive = stage === scanStage;
+              return (
+                <View key={stage} style={styles.stageStepRow}>
+                  <View style={[
+                    styles.stageCircle,
+                    isDone && styles.stageCircleDone,
+                    isActive && styles.stageCircleActive,
+                  ]}>
+                    {isDone ? (
+                      <Ionicons name="checkmark" size={12} color="#000" />
+                    ) : isActive ? (
+                      <ActivityIndicator size="small" color="#000" />
+                    ) : (
+                      <Text style={styles.stageCircleNum}>{stageIdx + 1}</Text>
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.stageStepText,
+                    isDone && styles.stageStepDone,
+                    isActive && styles.stageStepActive,
+                  ]}>
+                    {STAGE_CONFIG[stage].message}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Progress bar */}
+          <View style={styles.loadingProgressTrack}>
+            <Animated.View
+              style={[
+                styles.loadingProgressFill,
+                {
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["0%", "100%"],
+                  }),
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.loadingPercent}>
+            {Math.round(STAGE_CONFIG[scanStage].progress * 100)}%
+          </Text>
+        </View>
+
+        {/* Cancel button */}
+        <TouchableOpacity style={styles.loadingCancelBtn} onPress={resetToLive}>
+          <Text style={styles.loadingCancelText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!isLive && frozenUri) {
     return (
       <ScrollView style={styles.reportContainer} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -354,17 +476,14 @@ export default function ScanScreen() {
 
           {/* Bounding boxes — cover-mode mapping from image coords → screen */}
           {detections.map((d, i) => {
-            // Map image coords to display coords using cover-mode transform
             const rawLeft = (d.x - d.width / 2) * coverScale - coverOffsetX;
             const rawTop  = (d.y - d.height / 2) * coverScale - coverOffsetY;
             const rawW    = d.width  * coverScale;
             const rawH    = d.height * coverScale;
-            // Clamp to container bounds
             const boxLeft = Math.max(0, rawLeft);
             const boxTop  = Math.max(0, rawTop);
             const boxW    = Math.min(rawW, containerW - boxLeft);
             const boxH    = Math.min(rawH, containerH - boxTop);
-            // Skip boxes that are fully off-screen
             if (boxW <= 0 || boxH <= 0) return null;
 
             return (
@@ -400,33 +519,6 @@ export default function ScanScreen() {
             </View>
           )}
 
-          {/* Staged progress overlay while analyzing */}
-          {(scanStage !== "idle" && scanStage !== "done") && (
-            <View style={styles.scanningOverlay}>
-              <View style={styles.progressContainer}>
-                <View style={styles.progressTrack}>
-                  <Animated.View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: progressAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ["0%", "100%"],
-                        }),
-                      },
-                    ]}
-                  />
-                </View>
-                <View style={styles.stageRow}>
-                  <ActivityIndicator size="small" color="#84cc16" />
-                  <Text style={styles.stageText}>
-                    {STAGE_CONFIG[scanStage].message}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
           <TouchableOpacity style={styles.backButton} onPress={resetToLive}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
@@ -434,31 +526,7 @@ export default function ScanScreen() {
 
         {/* Analysis Card */}
         <View style={styles.analysisCard}>
-          {analyzing ? (
-            <View style={styles.analyzingContainer}>
-              <View style={styles.progressContainer}>
-                <View style={styles.progressTrack}>
-                  <Animated.View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: progressAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ["0%", "100%"],
-                        }),
-                      },
-                    ]}
-                  />
-                </View>
-                <View style={styles.stageRow}>
-                  <ActivityIndicator size="small" color="#84cc16" />
-                  <Text style={styles.stageText}>
-                    {STAGE_CONFIG[scanStage].message || "AI analyzing waste type..."}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ) : analysis ? (
+          {analysis ? (
             <>
               <Text style={styles.cardTitle}>AI Analysis</Text>
               <View style={styles.resultRow}>
@@ -904,5 +972,149 @@ const styles = StyleSheet.create({
     color: "#84cc16",
     fontSize: 13,
     fontWeight: "700",
+  },
+
+  // ─── Full-screen loading screen ─────
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  loadingBgImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  loadingDarkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.75)",
+  },
+  scanLine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "#84cc16",
+    shadowColor: "#84cc16",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  loadingCenter: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 40,
+    gap: 24,
+  },
+  pulseRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: "rgba(132,204,22,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pulseInner: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "rgba(132,204,22,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  stageSteps: {
+    width: "100%",
+    gap: 14,
+  },
+  stageStepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  stageCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  stageCircleDone: {
+    backgroundColor: "#84cc16",
+    borderColor: "#84cc16",
+  },
+  stageCircleActive: {
+    backgroundColor: "#84cc16",
+    borderColor: "#84cc16",
+    shadowColor: "#84cc16",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  stageCircleNum: {
+    color: "#555",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  stageStepText: {
+    color: "#555",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  stageStepDone: {
+    color: "#84cc16",
+  },
+  stageStepActive: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  loadingProgressTrack: {
+    width: "100%",
+    height: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  loadingProgressFill: {
+    height: "100%",
+    backgroundColor: "#84cc16",
+    borderRadius: 4,
+    shadowColor: "#84cc16",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+  },
+  loadingPercent: {
+    color: "#84cc16",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  loadingCancelBtn: {
+    position: "absolute",
+    bottom: 60,
+    alignSelf: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  loadingCancelText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
