@@ -9,7 +9,9 @@ import {
   StyleSheet,
   TextInput,
   Dimensions,
+  Animated,
 } from "react-native";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
@@ -51,6 +53,17 @@ type AnalysisResult = {
 
 
 
+type ScanStage = "idle" | "capturing" | "uploading" | "detecting" | "classifying" | "done";
+
+const STAGE_CONFIG: Record<ScanStage, { message: string; progress: number }> = {
+  idle: { message: "", progress: 0 },
+  capturing: { message: "Capturing image...", progress: 0.1 },
+  uploading: { message: "Uploading image...", progress: 0.3 },
+  detecting: { message: "Running AI detection...", progress: 0.6 },
+  classifying: { message: "Classifying severity...", progress: 0.85 },
+  done: { message: "Analysis complete!", progress: 1.0 },
+};
+
 export default function ScanScreen() {
   const { profile, refreshProfile } = useAuth();
   const cameraRef = useRef<CameraView>(null);
@@ -61,6 +74,10 @@ export default function ScanScreen() {
   const [summary, setSummary] = useState<DetectionResult["summary"] | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [isLive, setIsLive] = useState(true);
+
+  // Staged progress
+  const [scanStage, setScanStage] = useState<ScanStage>("idle");
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   // Camera photo dimensions (for display container aspect ratio)
   const [photoDims, setPhotoDims] = useState<{ w: number; h: number } | null>(null);
@@ -110,12 +127,23 @@ export default function ScanScreen() {
     return () => { sub?.remove(); };
   }, []);
 
+  // ─── Animate progress bar when stage changes ─────
+  const animateToStage = (stage: ScanStage) => {
+    setScanStage(stage);
+    Animated.timing(progressAnim, {
+      toValue: STAGE_CONFIG[stage].progress,
+      duration: 400,
+      useNativeDriver: false,
+    }).start();
+  };
+
   // ─── Scan button → detect + freeze + analyze ─────
   const handleScan = async () => {
     if (!cameraRef.current) return;
 
     try {
       setDetecting(true);
+      animateToStage("capturing");
 
       // Capture fresh GPS + compass heading at the instant of scan
       try {
@@ -141,53 +169,56 @@ export default function ScanScreen() {
       if (photo) {
         setIsLive(false);
         setFrozenUri(photo.uri);
-        setFrozenBase64(photo.base64 || null);
-        // Store camera photo's own dimensions for the display container
         setPhotoDims({ w: photo.width || SCREEN_W, h: photo.height || Math.round(SCREEN_W * 4 / 3) });
 
-        if (photo.base64) {
-          // Run detection (bounding boxes) and full analysis in parallel
+        // ── Stage: Uploading (resize + compress) ──
+        animateToStage("uploading");
+        const resized = await manipulateAsync(
+          photo.uri,
+          [{ resize: { width: 640 } }],
+          { compress: 0.5, format: SaveFormat.JPEG, base64: true }
+        );
+        const compressedBase64 = resized.base64 || photo.base64 || "";
+        setFrozenBase64(compressedBase64);
+        console.log("[Scan] Compressed size:", Math.round((compressedBase64.length * 3) / 4 / 1024), "KB");
+
+        if (compressedBase64) {
           setAnalyzing(true);
+
+          // ── Stage: Detecting ──
+          animateToStage("detecting");
           try {
-            const [detectionResult, analysisResult] = await Promise.allSettled([
-              detectObjects(photo.base64),
-              analyzeWaste(photo.base64),
-            ]);
-
-            if (detectionResult.status === "fulfilled") {
-              const dr = detectionResult.value as DetectionResult;
-              console.log("[Scan] Detection:", dr.detections.length, "items, roboflow image:", dr.image_width, "x", dr.image_height,
-                "camera photo:", photo.width, "x", photo.height);
-              setDetections(dr.detections);
-              setSummary(dr.summary);
-              // Store the image dimensions Roboflow used for coordinate scaling
-              if (dr.image_width && dr.image_height) {
-                setRoboImgDims({ w: dr.image_width, h: dr.image_height });
-              } else {
-                // Fallback to photo dims from camera
-                setRoboImgDims({ w: photo.width || SCREEN_W, h: photo.height || Math.round(SCREEN_W * 4 / 3) });
-              }
+            const detectionResult = await detectObjects(compressedBase64);
+            const dr = detectionResult as DetectionResult;
+            setDetections(dr.detections);
+            setSummary(dr.summary);
+            if (dr.image_width && dr.image_height) {
+              setRoboImgDims({ w: dr.image_width, h: dr.image_height });
             } else {
-              console.log("[Scan] Detection FAILED:", detectionResult.reason);
-            }
-
-            if (analysisResult.status === "fulfilled") {
-              setAnalysis(analysisResult.value);
-            } else {
-              console.log("Analysis error:", analysisResult.reason);
-              const fallbackSummary = detectionResult.status === "fulfilled" ? detectionResult.value.summary : null;
-              setAnalysis({
-                waste_type: fallbackSummary?.waste_type || "mixed",
-                severity: fallbackSummary?.severity || "medium",
-                confidence: 0.75,
-                action: "Analysis unavailable. Please submit with manual description.",
-              });
+              setRoboImgDims({ w: photo.width || SCREEN_W, h: photo.height || Math.round(SCREEN_W * 4 / 3) });
             }
           } catch (err) {
-            console.log("Scan processing error:", err);
-          } finally {
-            setAnalyzing(false);
+            console.log("[Scan] Detection failed:", err);
           }
+
+          // ── Stage: Classifying ──
+          animateToStage("classifying");
+          try {
+            const analysisResult = await analyzeWaste(compressedBase64);
+            setAnalysis(analysisResult);
+          } catch (err) {
+            console.log("[Scan] Analysis failed:", err);
+            setAnalysis({
+              waste_type: summary?.waste_type || "mixed",
+              severity: summary?.severity || "medium",
+              confidence: 0.75,
+              action: "Analysis unavailable. Please submit with manual description.",
+            });
+          }
+
+          // ── Stage: Done ──
+          animateToStage("done");
+          setAnalyzing(false);
         }
       }
     } catch (err) {
@@ -272,6 +303,8 @@ export default function ScanScreen() {
     setPhotoDims(null);
     setRoboImgDims(null);
     setHeading(null);
+    setScanStage("idle");
+    progressAnim.setValue(0);
   };
 
   // ─── Permission handling ────────────────
@@ -367,11 +400,30 @@ export default function ScanScreen() {
             </View>
           )}
 
-          {/* Loading overlay while detecting */}
-          {(analyzing && detections.length === 0) && (
+          {/* Staged progress overlay while analyzing */}
+          {(scanStage !== "idle" && scanStage !== "done") && (
             <View style={styles.scanningOverlay}>
-              <ActivityIndicator size="large" color="#84cc16" />
-              <Text style={styles.scanningOverlayText}>Detecting waste...</Text>
+              <View style={styles.progressContainer}>
+                <View style={styles.progressTrack}>
+                  <Animated.View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: progressAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ["0%", "100%"],
+                        }),
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={styles.stageRow}>
+                  <ActivityIndicator size="small" color="#84cc16" />
+                  <Text style={styles.stageText}>
+                    {STAGE_CONFIG[scanStage].message}
+                  </Text>
+                </View>
+              </View>
             </View>
           )}
 
@@ -384,8 +436,27 @@ export default function ScanScreen() {
         <View style={styles.analysisCard}>
           {analyzing ? (
             <View style={styles.analyzingContainer}>
-              <ActivityIndicator size="small" color="#84cc16" />
-              <Text style={styles.analyzingText}>Analyzing waste...</Text>
+              <View style={styles.progressContainer}>
+                <View style={styles.progressTrack}>
+                  <Animated.View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: progressAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ["0%", "100%"],
+                        }),
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={styles.stageRow}>
+                  <ActivityIndicator size="small" color="#84cc16" />
+                  <Text style={styles.stageText}>
+                    {STAGE_CONFIG[scanStage].message || "AI analyzing waste type..."}
+                  </Text>
+                </View>
+              </View>
             </View>
           ) : analysis ? (
             <>
@@ -800,5 +871,38 @@ const styles = StyleSheet.create({
     bottom: 0, right: 0,
     borderBottomWidth: 3, borderRightWidth: 3,
     borderBottomRightRadius: 4,
+  },
+
+  // ─── Progress bar ───────────────
+  progressContainer: {
+    width: "80%",
+    alignItems: "center",
+    gap: 12,
+  },
+  progressTrack: {
+    width: "100%",
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#84cc16",
+    borderRadius: 3,
+    shadowColor: "#84cc16",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+  },
+  stageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  stageText: {
+    color: "#84cc16",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

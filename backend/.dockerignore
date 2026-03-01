@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.git/
+.gitignore
+node_modules/
+seed_*.py
+serviceAccountKey.json
+README.md
+*.md
