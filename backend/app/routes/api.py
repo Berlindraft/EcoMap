@@ -5,12 +5,13 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Body
 from app.models.schemas import (
     UserCreate, UserUpdate, UserOut, UserRoleUpdate,
     ReportCreate, ReportOut,
-    JobCreate, JobOut, JobApplicationCreate, JobApplicationOut,
+    JobCreate, JobOut, JobApplicationCreate, JobApplicationOut, JobApprovalUpdate,
     RewardOut, RewardCreate, RewardUpdate, RedemptionCreate, RedemptionOut,
     EcoPointsOut, AIAnalysisResult, DetectionResult,
     CleanupVerifyRequest, CleanupVerifyResult,
     ProductCreate, ProductUpdate, ProductOut,
     DashboardStats,
+    TokenPurchaseCreate, TokenPurchaseOut, ConvertPointsRequest,
 )
 from app.services import firebase_service as fs
 from app.services.cloudinary_service import upload_image
@@ -151,7 +152,10 @@ async def list_jobs(limit: int = 50):
 
 @router.post("/jobs", response_model=JobOut)
 async def create_job(data: JobCreate):
-    return fs.create_job(data.model_dump())
+    try:
+        return fs.create_job(data.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/jobs/{job_id}/apply", response_model=JobApplicationOut)
@@ -263,6 +267,56 @@ async def update_user_role(uid: str, data: UserRoleUpdate):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+
+# ──────────────────────────────────────
+# ADMIN: JOB APPROVAL
+# ──────────────────────────────────────
+
+@router.get("/admin/jobs/pending", response_model=list[JobOut])
+async def list_pending_jobs():
+    return fs.get_pending_jobs()
+
+
+@router.put("/admin/jobs/{job_id}/approve", response_model=JobOut)
+async def approve_job(job_id: str, data: JobApprovalUpdate):
+    result = fs.approve_job(job_id, data.reviewer_id, data.note)
+    if not result:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return result
+
+
+@router.put("/admin/jobs/{job_id}/reject", response_model=JobOut)
+async def reject_job(job_id: str, data: JobApprovalUpdate):
+    result = fs.reject_job(job_id, data.reviewer_id, data.note)
+    if not result:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return result
+
+
+# ──────────────────────────────────────
+# ECO TOKENS & CREDITS
+# ──────────────────────────────────────
+
+@router.post("/tokens/purchase", response_model=TokenPurchaseOut)
+async def purchase_tokens(data: TokenPurchaseCreate):
+    try:
+        return fs.purchase_tokens(data.user_id, data.amount, data.php_amount)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tokens/convert-points")
+async def convert_points_to_credits(data: ConvertPointsRequest):
+    try:
+        return fs.convert_points_to_credits(data.user_id, data.points_to_convert)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/users/{uid}/tokens", response_model=list[TokenPurchaseOut])
+async def get_user_tokens(uid: str):
+    return fs.get_token_transactions(uid)
 
 
 # ──────────────────────────────────────

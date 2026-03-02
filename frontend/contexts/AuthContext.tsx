@@ -21,6 +21,8 @@ interface UserProfile {
   city: string;
   role: string;
   eco_points_balance: number;
+  eco_tokens_balance: number;
+  credits_balance: number;
 }
 
 interface AuthContextType {

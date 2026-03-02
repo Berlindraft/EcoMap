@@ -12,6 +12,10 @@ export default function ScreensLayout() {
           <Stack.Screen name="map" />
           <Stack.Screen name="scan" />
           <Stack.Screen name="jobs" />
+          <Stack.Screen name="post-job" />
+          <Stack.Screen name="buy-tokens" />
+          <Stack.Screen name="convert-points" />
+          <Stack.Screen name="job-approvals" />
           <Stack.Screen name="rewards" />
           <Stack.Screen name="profile" />
           <Stack.Screen name="dashboard" />

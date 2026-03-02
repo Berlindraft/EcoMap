@@ -16,12 +16,8 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
-import {
-  uploadImage,
-  analyzeWaste,
-  submitReport,
-  detectObjects,
-} from "../../services/api";
+import { uploadImage, submitReport } from "../../services/api";
+import { detectAndAnalyze } from "../../services/roboflow";
 import ResultModal from "../../components/ResultModal";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -53,14 +49,13 @@ type AnalysisResult = {
 
 
 
-type ScanStage = "idle" | "capturing" | "uploading" | "detecting" | "classifying" | "done";
+type ScanStage = "idle" | "capturing" | "uploading" | "detecting" | "done";
 
 const STAGE_CONFIG: Record<ScanStage, { message: string; progress: number }> = {
   idle: { message: "", progress: 0 },
-  capturing: { message: "Capturing image...", progress: 0.1 },
-  uploading: { message: "Uploading image...", progress: 0.3 },
-  detecting: { message: "Running AI detection...", progress: 0.6 },
-  classifying: { message: "Classifying severity...", progress: 0.85 },
+  capturing: { message: "Capturing image...", progress: 0.15 },
+  uploading: { message: "Preparing image...", progress: 0.35 },
+  detecting: { message: "Running AI detection...", progress: 0.7 },
   done: { message: "Analysis complete!", progress: 1.0 },
 };
 
@@ -170,51 +165,56 @@ export default function ScanScreen() {
       setDetecting(true);
       animateToStage("capturing");
 
-      // Capture fresh GPS + compass heading at the instant of scan
-      try {
-        const [loc, head] = await Promise.all([
-          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
-          Location.getHeadingAsync(),
-        ]);
-        setLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-        if (head.trueHeading >= 0) {
-          setHeading(head.trueHeading);
-        } else {
-          setHeading(head.magHeading);
-        }
-      } catch {
-        // Keep whatever location we already had from mount
-      }
-
+      // 1. Take photo FAST — no base64 encoding (just get the URI)
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.85,
-        base64: true,
+        quality: 0.5,
+        base64: false,
       });
 
       if (photo) {
+        // 2. FREEZE FRAME IMMEDIATELY — user sees the frozen image right away
         setIsLive(false);
         setFrozenUri(photo.uri);
         setPhotoDims({ w: photo.width || SCREEN_W, h: photo.height || Math.round(SCREEN_W * 4 / 3) });
 
-        // ── Stage: Uploading (resize + compress) ──
+        // 3. Fire GPS in background (don't wait for it)
+        (async () => {
+          try {
+            const [loc, head] = await Promise.all([
+              Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+              Location.getHeadingAsync(),
+            ]);
+            setLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+            setHeading(head.trueHeading >= 0 ? head.trueHeading : head.magHeading);
+          } catch {
+            // Keep whatever location we already had from mount
+          }
+        })();
+
+        // ── Stage: Preparing image (resize + compress) ──
         animateToStage("uploading");
+        console.log("[Scan] Compressing image...");
+        const t0 = Date.now();
         const resized = await manipulateAsync(
           photo.uri,
-          [{ resize: { width: 640 } }],
-          { compress: 0.5, format: SaveFormat.JPEG, base64: true }
+          [{ resize: { width: 416 } }],
+          { compress: 0.35, format: SaveFormat.JPEG, base64: true }
         );
-        const compressedBase64 = resized.base64 || photo.base64 || "";
+        const compressedBase64 = resized.base64 || "";
         setFrozenBase64(compressedBase64);
-        console.log("[Scan] Compressed size:", Math.round((compressedBase64.length * 3) / 4 / 1024), "KB");
+        console.log("[Scan] Compressed in", Date.now() - t0, "ms, size:", Math.round((compressedBase64.length * 3) / 4 / 1024), "KB");
 
         if (compressedBase64) {
           setAnalyzing(true);
 
-          // ── Stage: Detecting ──
+          // ── Stage: Detecting (single combined call) ──
           animateToStage("detecting");
           try {
-            const detectionResult = await detectObjects(compressedBase64);
-            const dr = detectionResult as DetectionResult;
+            const { detection: dr, analysis: ar } = await detectAndAnalyze(
+              compressedBase64,
+              photo.width || SCREEN_W,
+              photo.height || Math.round(SCREEN_W * 4 / 3),
+            );
             setDetections(dr.detections);
             setSummary(dr.summary);
             if (dr.image_width && dr.image_height) {
@@ -222,17 +222,9 @@ export default function ScanScreen() {
             } else {
               setRoboImgDims({ w: photo.width || SCREEN_W, h: photo.height || Math.round(SCREEN_W * 4 / 3) });
             }
+            setAnalysis(ar);
           } catch (err) {
-            console.log("[Scan] Detection failed:", err);
-          }
-
-          // ── Stage: Classifying ──
-          animateToStage("classifying");
-          try {
-            const analysisResult = await analyzeWaste(compressedBase64);
-            setAnalysis(analysisResult);
-          } catch (err) {
-            console.log("[Scan] Analysis failed:", err);
+            console.log("[Scan] Detection + analysis failed:", err);
             setAnalysis({
               waste_type: summary?.waste_type || "mixed",
               severity: summary?.severity || "medium",
@@ -367,7 +359,7 @@ export default function ScanScreen() {
   const coverOffsetY = (imgH * coverScale - containerH) / 2;
 
   // ─── Full-screen loading screen ──────
-  const STAGES_ORDER: ScanStage[] = ["capturing", "uploading", "detecting", "classifying", "done"];
+  const STAGES_ORDER: ScanStage[] = ["capturing", "uploading", "detecting", "done"];
 
   if (!isLive && frozenUri && scanStage !== "idle" && scanStage !== "done" && analyzing) {
     return (
@@ -755,7 +747,7 @@ const styles = StyleSheet.create({
   // ─── Scan button ────────────────────
   scanButtonContainer: {
     position: "absolute",
-    bottom: 120,
+    bottom: 50,
     alignSelf: "center",
     alignItems: "center",
   },

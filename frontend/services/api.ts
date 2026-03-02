@@ -15,13 +15,12 @@ const API_BASE_URL =
 async function request(path: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}/api${path}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout (Roboflow workflow + tunnel latency)
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
   try {
     const res = await fetch(url, {
       headers: {
         "Content-Type": "application/json",
-        "Bypass-Tunnel-Reminder": "true",
         ...options.headers as any,
       },
       ...options,
@@ -103,6 +102,9 @@ export async function createJob(data: {
   description?: string;
   location?: string;
   pay_amount?: number;
+  token_reward?: number;
+  credits_cost?: number;
+  image_url?: string;
 }) {
   return request("/jobs", { method: "POST", body: JSON.stringify(data) });
 }
@@ -112,6 +114,46 @@ export async function applyToJob(jobId: string, applicantId: string) {
     method: "POST",
     body: JSON.stringify({ job_id: jobId, applicant_id: applicantId }),
   });
+}
+
+// ─── Admin: Job Approval ──────────────
+
+export async function fetchPendingJobs() {
+  return request("/admin/jobs/pending");
+}
+
+export async function approveJob(jobId: string, reviewerId: string) {
+  return request(`/admin/jobs/${jobId}/approve`, {
+    method: "PUT",
+    body: JSON.stringify({ reviewer_id: reviewerId }),
+  });
+}
+
+export async function rejectJob(jobId: string, reviewerId: string) {
+  return request(`/admin/jobs/${jobId}/reject`, {
+    method: "PUT",
+    body: JSON.stringify({ reviewer_id: reviewerId }),
+  });
+}
+
+// ─── Eco Tokens & Credits ─────────────
+
+export async function purchaseTokens(userId: string, amount: number) {
+  return request("/tokens/purchase", {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId, amount, php_amount: amount }),
+  });
+}
+
+export async function convertPointsToCredits(userId: string, pointsToConvert: number) {
+  return request("/tokens/convert-points", {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId, points_to_convert: pointsToConvert }),
+  });
+}
+
+export async function fetchTokenTransactions(userId: string) {
+  return request(`/users/${userId}/tokens`);
 }
 
 // ─── Rewards ──────────────────────────
@@ -174,27 +216,15 @@ export async function uploadImage(fileUri: string) {
   const res = await fetch(url, {
     method: "POST",
     body: formData,
-    headers: { "Bypass-Tunnel-Reminder": "true" },
+    headers: {},
   });
   if (!res.ok) throw new Error("Image upload failed");
   return res.json(); // { url: "https://..." }
 }
 
-// ─── AI Analysis ──────────────────────
-
-export async function analyzeWaste(imageBase64: string) {
-  return request("/analyze", {
-    method: "POST",
-    body: JSON.stringify({ image_base64: imageBase64 }),
-  });
-}
-
-export async function detectObjects(imageBase64: string) {
-  return request("/detect", {
-    method: "POST",
-    body: JSON.stringify({ image_base64: imageBase64 }),
-  });
-}
+// ─── AI Analysis (now handled directly via roboflow.ts) ──
+// analyzeWaste and detectObjects have been moved to frontend/services/roboflow.ts
+// for direct Roboflow API calls, bypassing the backend server.
 
 // ─── Cleanup Verification ─────────────
 

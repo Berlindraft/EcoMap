@@ -39,6 +39,11 @@ class JobStatus(str, Enum):
     completed = "completed"
     cancelled = "cancelled"
 
+class JobApprovalStatus(str, Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
 class ApplicationStatus(str, Enum):
     pending = "pending"
     accepted = "accepted"
@@ -73,6 +78,8 @@ class UserCreate(BaseModel):
     profile_photo: Optional[str] = ""
     barangay: Optional[str] = ""
     city: Optional[str] = "Cebu City"
+    eco_tokens_balance: int = 0
+    credits_balance: int = 15  # all users get 15 free credits
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -94,6 +101,8 @@ class UserOut(BaseModel):
     city: str = "Cebu City"
     role: str = "user"
     eco_points_balance: int = 0
+    eco_tokens_balance: int = 0
+    credits_balance: int = 15
     created_at: Optional[str] = None
 
 
@@ -140,10 +149,14 @@ class JobCreate(BaseModel):
     geo_lat: float = 0.0
     geo_lng: float = 0.0
     pay_amount: float = 0.0
+    token_reward: int = 0       # eco tokens offered to the worker
+    credits_cost: int = 10      # credits deducted from poster (default 10)
+    image_url: str = ""
 
 class JobOut(BaseModel):
     job_id: str
     posted_by: str
+    poster_name: str = ""
     job_type: str = "cleanup"
     title: str = ""
     description: str = ""
@@ -151,8 +164,39 @@ class JobOut(BaseModel):
     geo_lat: float = 0.0
     geo_lng: float = 0.0
     pay_amount: float = 0.0
+    token_reward: int = 0
+    credits_cost: int = 10
+    image_url: str = ""
+    approval_status: str = "pending"  # pending / approved / rejected
+    reviewer_id: str = ""
     status: str = "open"
     created_at: Optional[str] = None
+
+class JobApprovalUpdate(BaseModel):
+    reviewer_id: str
+    note: str = ""
+
+
+# ──────────────────────────────────────
+# Eco Tokens & Credits
+# ──────────────────────────────────────
+
+class TokenPurchaseCreate(BaseModel):
+    user_id: str
+    amount: int           # number of tokens to buy
+    php_amount: float     # PHP paid (1 token = 1 PHP)
+
+class TokenPurchaseOut(BaseModel):
+    transaction_id: str
+    user_id: str
+    type: str = "purchase"  # purchase / convert / escrow / payout
+    amount: int = 0
+    php_amount: float = 0.0
+    created_at: Optional[str] = None
+
+class ConvertPointsRequest(BaseModel):
+    user_id: str
+    points_to_convert: int  # must be multiple of 5
 
 class JobApplicationCreate(BaseModel):
     job_id: str

@@ -32,6 +32,8 @@ def create_user(data: dict) -> dict:
         "city": data.get("city", "Cebu City"),
         "role": "user",
         "eco_points_balance": 0,
+        "eco_tokens_balance": 0,
+        "credits_balance": 15,  # all users get 15 free credits
         "created_at": _now(),
     }
     db.collection("users").document(uid).set(doc)
@@ -187,10 +189,51 @@ def mark_report_cleaned(report_id: str, user_id: str, cleanup_image_url: str = "
 # ──────────────────────────────────────
 
 def create_job(data: dict) -> dict:
+    """Create a job posting. Validates tokens + credits before creating.
+    Deducts credits and escrows tokens from the poster."""
+    user_id = data["posted_by"]
+    user = get_user(user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    credits_cost = data.get("credits_cost", 10)
+    token_reward = data.get("token_reward", 0)
+
+    # Validate credits
+    user_credits = user.get("credits_balance", 0)
+    if user_credits < credits_cost:
+        raise ValueError(f"Insufficient credits. Need {credits_cost}, have {user_credits}")
+
+    # Validate tokens
+    user_tokens = user.get("eco_tokens_balance", 0)
+    if user_tokens < token_reward:
+        raise ValueError(f"Insufficient tokens. Need {token_reward}, have {user_tokens}")
+
+    # Deduct credits and escrow tokens
+    new_credits = user_credits - credits_cost
+    new_tokens = user_tokens - token_reward
+    db.collection("users").document(user_id).update({
+        "credits_balance": new_credits,
+        "eco_tokens_balance": new_tokens,
+    })
+
+    # Log token escrow transaction
+    if token_reward > 0:
+        tx_id = _new_id()
+        db.collection("token_transactions").document(tx_id).set({
+            "transaction_id": tx_id,
+            "user_id": user_id,
+            "type": "escrow",
+            "amount": -token_reward,
+            "php_amount": 0.0,
+            "created_at": _now(),
+        })
+
     job_id = _new_id()
     doc = {
         "job_id": job_id,
-        "posted_by": data["posted_by"],
+        "posted_by": user_id,
+        "poster_name": user.get("full_name", ""),
         "job_type": data.get("job_type", "cleanup"),
         "title": data.get("title", ""),
         "description": data.get("description", ""),
@@ -198,6 +241,11 @@ def create_job(data: dict) -> dict:
         "geo_lat": data.get("geo_lat", 0.0),
         "geo_lng": data.get("geo_lng", 0.0),
         "pay_amount": data.get("pay_amount", 0.0),
+        "token_reward": token_reward,
+        "credits_cost": credits_cost,
+        "image_url": data.get("image_url", ""),
+        "approval_status": "pending",
+        "reviewer_id": "",
         "status": "open",
         "created_at": _now(),
     }
@@ -206,13 +254,65 @@ def create_job(data: dict) -> dict:
 
 
 def get_jobs(limit: int = 50) -> list[dict]:
+    """Return only approved jobs for public listing."""
     docs = (
         db.collection("jobs")
         .order_by("created_at", direction="DESCENDING")
         .limit(limit)
         .stream()
     )
-    return [d.to_dict() for d in docs]
+    return [d.to_dict() for d in docs if d.to_dict().get("approval_status") == "approved"]
+
+
+def get_pending_jobs() -> list[dict]:
+    """Return jobs pending admin approval."""
+    docs = db.collection("jobs").stream()
+    results = [d.to_dict() for d in docs if d.to_dict().get("approval_status") == "pending"]
+    results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return results
+
+
+def approve_job(job_id: str, reviewer_id: str, note: str = "") -> dict | None:
+    ref = db.collection("jobs").document(job_id)
+    snap = ref.get()
+    if not snap.exists:
+        return None
+    ref.update({
+        "approval_status": "approved",
+        "reviewer_id": reviewer_id,
+    })
+    return ref.get().to_dict()
+
+
+def reject_job(job_id: str, reviewer_id: str, note: str = "") -> dict | None:
+    """Reject a job and refund the poster's credits + tokens."""
+    ref = db.collection("jobs").document(job_id)
+    snap = ref.get()
+    if not snap.exists:
+        return None
+    job = snap.to_dict()
+
+    ref.update({
+        "approval_status": "rejected",
+        "reviewer_id": reviewer_id,
+    })
+
+    # Refund credits and tokens to the poster
+    poster_id = job.get("posted_by", "")
+    if poster_id:
+        user = get_user(poster_id)
+        if user:
+            refund_credits = job.get("credits_cost", 0)
+            refund_tokens = job.get("token_reward", 0)
+            updates = {}
+            if refund_credits:
+                updates["credits_balance"] = user.get("credits_balance", 0) + refund_credits
+            if refund_tokens:
+                updates["eco_tokens_balance"] = user.get("eco_tokens_balance", 0) + refund_tokens
+            if updates:
+                db.collection("users").document(poster_id).update(updates)
+
+    return ref.get().to_dict()
 
 
 def apply_to_job(data: dict) -> dict:
@@ -392,7 +492,78 @@ def get_user_points_history(user_id: str) -> list[dict]:
         .stream()
     )
     results = [d.to_dict() for d in docs]
-    # Sort in Python to avoid needing a composite index
+    results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return results
+
+
+# ──────────────────────────────────────
+# ECO TOKENS & CREDITS
+# ──────────────────────────────────────
+
+def purchase_tokens(user_id: str, amount: int, php_amount: float) -> dict:
+    """Purchase eco tokens (mock payment). 1 token = 1 PHP."""
+    user = get_user(user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    new_balance = user.get("eco_tokens_balance", 0) + amount
+    db.collection("users").document(user_id).update({"eco_tokens_balance": new_balance})
+
+    tx_id = _new_id()
+    doc = {
+        "transaction_id": tx_id,
+        "user_id": user_id,
+        "type": "purchase",
+        "amount": amount,
+        "php_amount": php_amount,
+        "created_at": _now(),
+    }
+    db.collection("token_transactions").document(tx_id).set(doc)
+    return doc
+
+
+def convert_points_to_credits(user_id: str, points_to_convert: int) -> dict:
+    """Convert eco points to credits. 5 points = 1 credit."""
+    if points_to_convert < 5 or points_to_convert % 5 != 0:
+        raise ValueError("Points must be a multiple of 5")
+
+    user = get_user(user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    current_points = user.get("eco_points_balance", 0)
+    if current_points < points_to_convert:
+        raise ValueError(f"Insufficient points. Need {points_to_convert}, have {current_points}")
+
+    credits_gained = points_to_convert // 5
+    new_points = current_points - points_to_convert
+    new_credits = user.get("credits_balance", 0) + credits_gained
+
+    db.collection("users").document(user_id).update({
+        "eco_points_balance": new_points,
+        "credits_balance": new_credits,
+    })
+
+    tx_id = _new_id()
+    doc = {
+        "transaction_id": tx_id,
+        "user_id": user_id,
+        "type": "convert",
+        "amount": credits_gained,
+        "php_amount": 0.0,
+        "created_at": _now(),
+    }
+    db.collection("token_transactions").document(tx_id).set(doc)
+    return {"credits_gained": credits_gained, "new_points": new_points, "new_credits": new_credits}
+
+
+def get_token_transactions(user_id: str) -> list[dict]:
+    docs = (
+        db.collection("token_transactions")
+        .where(filter=FieldFilter("user_id", "==", user_id))
+        .stream()
+    )
+    results = [d.to_dict() for d in docs]
     results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return results
 
