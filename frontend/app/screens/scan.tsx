@@ -496,7 +496,7 @@ export default function ScanScreen() {
 
   if (!isLive && frozenUri) {
     return (
-      <ScrollView style={styles.reportContainer} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView style={styles.reportContainer}>
         {/* Frozen image with bounding box overlays — matches camera framing */}
         <View style={[styles.frozenImageContainer, { height: containerH }]}>
           <Image
@@ -644,7 +644,7 @@ export default function ScanScreen() {
 
   // ─── Live camera mode ───────────────────
   return (
-    <View style={styles.container} onLayout={(e) => setViewH(e.nativeEvent.layout.height)}>
+    <View style={[styles.container, {marginBottom: 0}]} onLayout={(e) => setViewH(e.nativeEvent.layout.height)}>
       {/* Camera — no children allowed */}
       <CameraView
         ref={cameraRef}

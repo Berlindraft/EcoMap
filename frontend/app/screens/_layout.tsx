@@ -11,11 +11,11 @@ export default function ScreensLayout() {
   return (
     <View style={{ flex: 1 }}>
       {/* Stack for Screens — leave room for the navbar */}
-      <View style={{ flex: 1, marginBottom: 80 }}>
+      <View style={{ flex: 1, marginBottom: currentScreen === "scan" ? 0 : 80 }}>
         <Stack screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}>
           <Stack.Screen name="home" />
           <Stack.Screen name="map" />
-          <Stack.Screen name="scan" />
+          <Stack.Screen name="scan"/>
           <Stack.Screen name="jobs" />
           <Stack.Screen name="post-job" />
           <Stack.Screen name="buy-tokens" />
