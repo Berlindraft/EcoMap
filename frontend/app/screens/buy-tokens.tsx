@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TextInput,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +14,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
 import { useDataCache } from "../../contexts/DataCache";
 import { purchaseTokens } from "../../services/api";
+import ResultModal from "../../components/ResultModal";
 
 type Transaction = {
   transaction_id: string;
@@ -34,6 +34,8 @@ export default function BuyTokensScreen() {
   const [buyAmount, setBuyAmount] = useState("");
   const [purchasing, setPurchasing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalData, setModalData] = useState({ success: true, title: "", message: "", detail: "", detailIcon: "" as any });
 
   const userTokens = profile?.eco_tokens_balance ?? 0;
   const transactions = tokenTransactions.filter((t: Transaction) => t.type === "purchase");
@@ -53,9 +55,11 @@ export default function BuyTokensScreen() {
       if (refreshProfile) await refreshProfile();
       await refreshTokens();
       setBuyAmount("");
-      Alert.alert("Tokens Purchased! 💎", `${amount} Eco Tokens added to your balance.`);
+      setModalData({ success: true, title: "Tokens Purchased! 💎", message: `${amount} Eco Tokens added to your balance.`, detail: `+${amount} Tokens`, detailIcon: "diamond" });
+      setModalVisible(true);
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Purchase failed.");
+      setModalData({ success: false, title: "Purchase Failed", message: err?.message || "Purchase failed.", detail: "", detailIcon: "" });
+      setModalVisible(true);
     } finally {
       setPurchasing(false);
     }
@@ -72,6 +76,7 @@ export default function BuyTokensScreen() {
   };
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
@@ -182,6 +187,17 @@ export default function BuyTokensScreen() {
         ))
       )}
     </ScrollView>
+
+      <ResultModal
+        visible={modalVisible}
+        success={modalData.success}
+        title={modalData.title}
+        message={modalData.message}
+        detail={modalData.detail || undefined}
+        detailIcon={modalData.detailIcon || undefined}
+        onDismiss={() => setModalVisible(false)}
+      />
+    </>
   );
 }
 

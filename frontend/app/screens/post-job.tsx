@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TextInput,
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../../contexts/AuthContext";
 import { useDataCache } from "../../contexts/DataCache";
 import { createJob, uploadImage } from "../../services/api";
+import ResultModal from "../../components/ResultModal";
 
 const JOB_TYPES = [
   { id: "cleanup", label: "Cleanup", icon: "leaf-outline" as const, color: "#84cc16" },
@@ -39,6 +39,8 @@ export default function PostJobScreen() {
   const [tokenReward, setTokenReward] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalData, setModalData] = useState({ success: true, title: "", message: "", detail: "", detailIcon: "" as any });
 
   const userTokens = profile?.eco_tokens_balance ?? 0;
   const userCredits = profile?.credits_balance ?? 15;
@@ -60,7 +62,8 @@ export default function PostJobScreen() {
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Permission needed", "Camera access is required.");
+      setModalData({ success: false, title: "Permission Needed", message: "Camera access is required to take a photo.", detail: "", detailIcon: "camera" });
+      setModalVisible(true);
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -76,11 +79,13 @@ export default function PostJobScreen() {
     if (!profile?.uid || !title) return;
 
     if (userCredits < CREDITS_PER_POST) {
-      Alert.alert("Insufficient Credits", `You need ${CREDITS_PER_POST} credits to post a job. You have ${userCredits}.`);
+      setModalData({ success: false, title: "Insufficient Credits", message: `You need ${CREDITS_PER_POST} credits to post a job. You have ${userCredits}.`, detail: "", detailIcon: "ticket" });
+      setModalVisible(true);
       return;
     }
     if (rewardAmount > 0 && userTokens < rewardAmount) {
-      Alert.alert("Insufficient Tokens", `You need ${rewardAmount} tokens for the reward. You have ${userTokens}.`);
+      setModalData({ success: false, title: "Insufficient Tokens", message: `You need ${rewardAmount} tokens for the reward. You have ${userTokens}.`, detail: "", detailIcon: "diamond" });
+      setModalVisible(true);
       return;
     }
 
@@ -106,14 +111,18 @@ export default function PostJobScreen() {
       if (refreshProfile) await refreshProfile();
       await Promise.all([refreshJobs(), refreshPendingJobs()]);
 
-      Alert.alert(
-        "Job Submitted! 🎉",
-        "Your job posting is pending admin approval. You'll be notified once approved.",
-        [{ text: "OK", onPress: () => router.back() }]
-      );
+      setModalData({
+        success: true,
+        title: "Job Submitted! 🎉",
+        message: "Your job posting is pending admin approval. You'll be notified once approved.",
+        detail: `-${CREDITS_PER_POST} Credits`,
+        detailIcon: "ticket",
+      });
+      setModalVisible(true);
     } catch (err: any) {
       const msg = err?.message || "Failed to post job.";
-      Alert.alert("Error", msg);
+      setModalData({ success: false, title: "Error", message: msg, detail: "", detailIcon: "" });
+      setModalVisible(true);
     } finally {
       setPosting(false);
     }
@@ -261,6 +270,19 @@ export default function PostJobScreen() {
           </Text>
         )}
       </ScrollView>
+
+      <ResultModal
+        visible={modalVisible}
+        success={modalData.success}
+        title={modalData.title}
+        message={modalData.message}
+        detail={modalData.detail || undefined}
+        detailIcon={modalData.detailIcon || undefined}
+        onDismiss={() => {
+          setModalVisible(false);
+          if (modalData.success) router.back();
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

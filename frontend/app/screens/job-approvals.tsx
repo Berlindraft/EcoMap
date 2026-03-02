@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Image,
   RefreshControl,
 } from "react-native";
@@ -15,6 +14,8 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
 import { useDataCache } from "../../contexts/DataCache";
 import { approveJob, rejectJob } from "../../services/api";
+import ResultModal from "../../components/ResultModal";
+import ConfirmModal from "../../components/ConfirmModal";
 
 type PendingJob = {
   job_id: string;
@@ -37,56 +38,62 @@ export default function JobApprovalsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Confirm modal state
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmData, setConfirmData] = useState({ title: "", message: "", destructive: false, jobId: "", action: "" as "approve" | "reject" });
+
+  // Result modal state
+  const [resultVisible, setResultVisible] = useState(false);
+  const [resultData, setResultData] = useState({ success: true, title: "", message: "", detail: "", detailIcon: "" as any });
+
   const onRefresh = async () => {
     setRefreshing(true);
     await refreshPendingJobs();
     setRefreshing(false);
   };
 
-  const handleApprove = async (jobId: string, title: string) => {
-    if (!profile?.uid) return;
-    Alert.alert("Approve Job?", `Approve "${title}"?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Approve",
-        style: "default",
-        onPress: async () => {
-          setActionLoading(jobId);
-          try {
-            await approveJob(jobId, profile.uid);
-            await Promise.all([refreshPendingJobs(), refreshJobs()]);
-            Alert.alert("Approved ✅", "The job is now visible to users.");
-          } catch (err) {
-            Alert.alert("Error", "Failed to approve job.");
-          } finally {
-            setActionLoading(null);
-          }
-        },
-      },
-    ]);
+  const handleApprove = (jobId: string, title: string) => {
+    setConfirmData({
+      title: "Approve Job?",
+      message: `Approve "${title}"? It will become visible to all users.`,
+      destructive: false,
+      jobId,
+      action: "approve",
+    });
+    setConfirmVisible(true);
   };
 
-  const handleReject = async (jobId: string, title: string) => {
+  const handleReject = (jobId: string, title: string) => {
+    setConfirmData({
+      title: "Reject Job?",
+      message: `Reject "${title}"? Credits and tokens will be refunded to the poster.`,
+      destructive: true,
+      jobId,
+      action: "reject",
+    });
+    setConfirmVisible(true);
+  };
+
+  const executeAction = async () => {
     if (!profile?.uid) return;
-    Alert.alert("Reject Job?", `Reject "${title}"? Credits and tokens will be refunded.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Reject",
-        style: "destructive",
-        onPress: async () => {
-          setActionLoading(jobId);
-          try {
-            await rejectJob(jobId, profile.uid);
-            await refreshPendingJobs();
-            Alert.alert("Rejected", "Credits and tokens have been refunded.");
-          } catch (err) {
-            Alert.alert("Error", "Failed to reject job.");
-          } finally {
-            setActionLoading(null);
-          }
-        },
-      },
-    ]);
+    setConfirmVisible(false);
+    setActionLoading(confirmData.jobId);
+    try {
+      if (confirmData.action === "approve") {
+        await approveJob(confirmData.jobId, profile.uid);
+        await Promise.all([refreshPendingJobs(), refreshJobs()]);
+        setResultData({ success: true, title: "Approved ✅", message: "The job is now visible to users.", detail: "", detailIcon: "checkmark-circle" });
+      } else {
+        await rejectJob(confirmData.jobId, profile.uid);
+        await refreshPendingJobs();
+        setResultData({ success: true, title: "Rejected", message: "Credits and tokens have been refunded.", detail: "Refunded", detailIcon: "arrow-undo" });
+      }
+    } catch (err) {
+      setResultData({ success: false, title: "Error", message: `Failed to ${confirmData.action} job.`, detail: "", detailIcon: "" });
+    } finally {
+      setActionLoading(null);
+      setResultVisible(true);
+    }
   };
 
   const timeAgo = (dateStr: string) => {
@@ -114,6 +121,7 @@ export default function JobApprovalsScreen() {
   }
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
@@ -214,6 +222,29 @@ export default function JobApprovalsScreen() {
         })
       )}
     </ScrollView>
+
+      <ConfirmModal
+        visible={confirmVisible}
+        title={confirmData.title}
+        message={confirmData.message}
+        icon={confirmData.destructive ? "warning" : "shield-checkmark"}
+        destructive={confirmData.destructive}
+        confirmLabel={confirmData.action === "approve" ? "Approve" : "Reject"}
+        accentColor={confirmData.destructive ? "#ef4444" : "#84cc16"}
+        onConfirm={executeAction}
+        onCancel={() => setConfirmVisible(false)}
+      />
+
+      <ResultModal
+        visible={resultVisible}
+        success={resultData.success}
+        title={resultData.title}
+        message={resultData.message}
+        detail={resultData.detail || undefined}
+        detailIcon={resultData.detailIcon || undefined}
+        onDismiss={() => setResultVisible(false)}
+      />
+    </>
   );
 }
 

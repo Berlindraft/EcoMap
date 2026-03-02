@@ -10,10 +10,10 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
+import ResultModal from "../../components/ResultModal";
 
 export default function SignupView() {
   const router = useRouter();
@@ -23,14 +23,18 @@ export default function SignupView() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalData, setModalData] = useState({ success: true, title: "", message: "", detail: "", detailIcon: "" as any });
 
   const handleSignup = async () => {
     if (!name || !email || !password) {
-      Alert.alert("Error", "Please fill in all fields.");
+      setModalData({ success: false, title: "Error", message: "Please fill in all fields.", detail: "", detailIcon: "" });
+      setModalVisible(true);
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters.");
+      setModalData({ success: false, title: "Error", message: "Password must be at least 6 characters.", detail: "", detailIcon: "" });
+      setModalVisible(true);
       return;
     }
     setLoading(true);
@@ -44,13 +48,15 @@ export default function SignupView() {
           : err?.code === "auth/weak-password"
           ? "Password is too weak."
           : err?.message || "Signup failed.";
-      Alert.alert("Signup Failed", msg);
+      setModalData({ success: false, title: "Signup Failed", message: msg, detail: "", detailIcon: "" });
+      setModalVisible(true);
     } finally {
       setLoading(false);
     }
   };
 
   return (
+    <>
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#000" }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -134,6 +140,17 @@ export default function SignupView() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+
+      <ResultModal
+        visible={modalVisible}
+        success={modalData.success}
+        title={modalData.title}
+        message={modalData.message}
+        detail={modalData.detail || undefined}
+        detailIcon={modalData.detailIcon || undefined}
+        onDismiss={() => setModalVisible(false)}
+      />
+    </>
   );
 }
 

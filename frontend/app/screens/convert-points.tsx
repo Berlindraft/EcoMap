@@ -7,13 +7,13 @@ import {
   StyleSheet,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
 import { useDataCache } from "../../contexts/DataCache";
 import { convertPointsToCredits } from "../../services/api";
+import ResultModal from "../../components/ResultModal";
 
 const PRESET_POINTS = [5, 10, 25, 50, 100];
 
@@ -24,6 +24,8 @@ export default function ConvertPointsScreen() {
 
   const [amount, setAmount] = useState("");
   const [converting, setConverting] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalData, setModalData] = useState({ success: true, title: "", message: "", detail: "", detailIcon: "" as any });
 
   const userPoints = profile?.eco_points_balance ?? 0;
   const userCredits = profile?.credits_balance ?? 15;
@@ -39,15 +41,18 @@ export default function ConvertPointsScreen() {
       if (refreshProfile) await refreshProfile();
       await refreshTokens();
       setAmount("");
-      Alert.alert("Converted! ✅", `${pointsNum} points → ${creditsGained} credits`);
+      setModalData({ success: true, title: "Converted! ✅", message: `${pointsNum} points converted into ${creditsGained} credits.`, detail: `+${creditsGained} Credits`, detailIcon: "ticket" });
+      setModalVisible(true);
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Conversion failed.");
+      setModalData({ success: false, title: "Conversion Failed", message: err?.message || "Conversion failed.", detail: "", detailIcon: "" });
+      setModalVisible(true);
     } finally {
       setConverting(false);
     }
   };
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Header */}
       <View style={styles.header}>
@@ -167,6 +172,17 @@ export default function ConvertPointsScreen() {
         </TouchableOpacity>
       )}
     </ScrollView>
+
+      <ResultModal
+        visible={modalVisible}
+        success={modalData.success}
+        title={modalData.title}
+        message={modalData.message}
+        detail={modalData.detail || undefined}
+        detailIcon={modalData.detailIcon || undefined}
+        onDismiss={() => setModalVisible(false)}
+      />
+    </>
   );
 }
 

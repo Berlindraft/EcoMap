@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +13,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
 import { useDataCache } from "../../contexts/DataCache";
 import { applyToJob } from "../../services/api";
+import ResultModal from "../../components/ResultModal";
 
 type Job = {
   job_id: string;
@@ -34,6 +34,8 @@ export default function JobsScreen() {
   const { jobs, jobsLoading: loading, refreshJobs } = useDataCache();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalData, setModalData] = useState({ success: true, title: "", message: "", detail: "", detailIcon: "" as any });
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -45,9 +47,11 @@ export default function JobsScreen() {
     if (!profile?.uid) return;
     try {
       await applyToJob(jobId, profile.uid);
-      Alert.alert("Applied! ✅", "You have successfully applied to this job.");
+      setModalData({ success: true, title: "Applied! ✅", message: "You have successfully applied to this job.", detail: "", detailIcon: "briefcase" });
+      setModalVisible(true);
     } catch (err) {
-      Alert.alert("Error", "Failed to apply. Please try again.");
+      setModalData({ success: false, title: "Application Failed", message: "Failed to apply. Please try again.", detail: "", detailIcon: "" });
+      setModalVisible(true);
     }
   };
 
@@ -200,6 +204,16 @@ export default function JobsScreen() {
           </View>
         )}
       </ScrollView>
+
+      <ResultModal
+        visible={modalVisible}
+        success={modalData.success}
+        title={modalData.title}
+        message={modalData.message}
+        detail={modalData.detail || undefined}
+        detailIcon={modalData.detailIcon || undefined}
+        onDismiss={() => setModalVisible(false)}
+      />
     </View>
   );
 }

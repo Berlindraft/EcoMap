@@ -10,10 +10,10 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
+import ResultModal from "../../components/ResultModal";
 
 export default function LoginView() {
   const router = useRouter();
@@ -22,10 +22,13 @@ export default function LoginView() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalData, setModalData] = useState({ success: true, title: "", message: "", detail: "", detailIcon: "" as any });
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please enter email and password.");
+      setModalData({ success: false, title: "Error", message: "Please enter email and password.", detail: "", detailIcon: "" });
+      setModalVisible(true);
       return;
     }
     setLoading(true);
@@ -39,13 +42,15 @@ export default function LoginView() {
           : err?.code === "auth/user-not-found"
           ? "No account found with that email."
           : err?.message || "Login failed.";
-      Alert.alert("Login Failed", msg);
+      setModalData({ success: false, title: "Login Failed", message: msg, detail: "", detailIcon: "" });
+      setModalVisible(true);
     } finally {
       setLoading(false);
     }
   };
 
   return (
+    <>
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#000" }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -120,6 +125,17 @@ export default function LoginView() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+
+      <ResultModal
+        visible={modalVisible}
+        success={modalData.success}
+        title={modalData.title}
+        message={modalData.message}
+        detail={modalData.detail || undefined}
+        detailIcon={modalData.detailIcon || undefined}
+        onDismiss={() => setModalVisible(false)}
+      />
+    </>
   );
 }
 
