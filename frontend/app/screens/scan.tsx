@@ -11,6 +11,7 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
@@ -67,6 +68,7 @@ export default function ScanScreen() {
   const [zoom, setZoom] = useState(0);
   const pinchStartDistanceRef = useRef<number | null>(null);
   const pinchStartZoomRef = useRef(0);
+  const router = useRouter();
 
   // Detection state
   const [detections, setDetections] = useState<Detection[]>([]);
@@ -361,6 +363,10 @@ export default function ScanScreen() {
     setHeading(null);
     setScanStage("idle");
     progressAnim.setValue(0);
+  };
+
+  const handleBackButton = () => {
+    router.back();
   };
 
   // ─── Permission handling ────────────────
@@ -661,6 +667,8 @@ export default function ScanScreen() {
         zoom={zoom}
       />
 
+      
+
       {/* Camera controls */}
       <View style={styles.cameraControls}>
         <TouchableOpacity
@@ -675,6 +683,10 @@ export default function ScanScreen() {
         </TouchableOpacity>
       </View>
 
+      <TouchableOpacity style={[styles.backButton, {top: 60}]} onPress={handleBackButton}>
+        <Ionicons name="arrow-back" size={24} color="#fff" />
+      </TouchableOpacity>
+      
       <View style={styles.zoomControls} pointerEvents="none">
         <Ionicons name="search" size={14} color="#fff" />
         <Text style={styles.zoomText}>{(1 + zoom).toFixed(1)}x · Pinch to zoom</Text>
@@ -832,8 +844,8 @@ const styles = StyleSheet.create({
   },
   zoomControls: {
     position: "absolute",
-    top: 60,
-    right: 66,
+    top: 64,
+    right: "30%",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -986,6 +998,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
+    marginBottom: 40
   },
   submitText: { color: "#000", fontSize: 15, fontWeight: "800" },
 
