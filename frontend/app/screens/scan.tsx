@@ -916,22 +916,22 @@ const styles = StyleSheet.create({
     borderColor: "#84cc16",
   },
   cornerTL: {
-    top: 0, left: 0,
+    top: 150, left: 50,
     borderTopWidth: 3, borderLeftWidth: 3,
     borderTopLeftRadius: 4,
   },
   cornerTR: {
-    top: 0, right: 0,
+    top: 150, right: 50,
     borderTopWidth: 3, borderRightWidth: 3,
     borderTopRightRadius: 4,
   },
   cornerBL: {
-    bottom: 0, left: 0,
+    bottom: 150, left: 50,
     borderBottomWidth: 3, borderLeftWidth: 3,
     borderBottomLeftRadius: 4,
   },
   cornerBR: {
-    bottom: 0, right: 0,
+    bottom: 150, right: 50,
     borderBottomWidth: 3, borderRightWidth: 3,
     borderBottomRightRadius: 4,
   },

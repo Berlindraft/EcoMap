@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  ImageBackground,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,37 +20,41 @@ import { useDataCache } from "../../contexts/DataCache";
 
 const { width } = Dimensions.get("window");
 const AD_WIDTH = width - 32;
-const AD_HEIGHT = 70;
+const AD_HEIGHT = 80;
 
 // ── Ad data (replace with real ads / fetch from backend later) ──
 const ADS = [
   {
     id: "1",
-    gradient: ["#84cc16", "#15803d"] as [string, string],
+    gradient: ["#84cc16aa", "#15803daa"], // added alpha for soft overlay
     icon: "leaf" as const,
     title: "Go Green with EcoMap!",
     subtitle: "Earn points for every cleanup report you submit.",
+    image: require("../../assets/images/ads1.jpg"),
   },
   {
     id: "2",
-    gradient: ["#3b82f6", "#1e40af"] as [string, string],
+    gradient: ["#3b82f6aa", "#1e40afaa"],
     icon: "gift" as const,
     title: "Redeem Eco-Rewards",
     subtitle: "Use your points for discounts at partner stores.",
+    image: require("../../assets/images/ads2.png"),
   },
   {
     id: "3",
-    gradient: ["#f97316", "#c2410c"] as [string, string],
+    gradient: ["#f97316aa", "#c2410caa"],
     icon: "briefcase" as const,
     title: "TrashCare Jobs",
     subtitle: "Help your community and earn income or points.",
+    image: require("../../assets/images/ads3.jpg"),
   },
   {
     id: "4",
-    gradient: ["#ec4899", "#9d174d"] as [string, string],
+    gradient: ["#ec4899aa", "#9d174daa"],
     icon: "people" as const,
     title: "Invite Friends",
     subtitle: "Grow the EcoMap community in Cebu!",
+    image: require("../../assets/images/ads4.jpg"),
   },
 ];
 
@@ -223,23 +228,29 @@ export default function HomeScreen() {
                 setActiveAd(idx);
               }}
               renderItem={({ item }) => (
-                <LinearGradient
-                  colors={item.gradient}
-                  start={[0, 0]}
-                  end={[1, 1]}
+                <ImageBackground
+                  source={item.image}
                   style={styles.adCard}
+                  imageStyle={{ borderRadius: 12 }} // optional rounded corners
                 >
-                  <View style={styles.adContent}>
-                    <View style={styles.adIconWrap}>
-                      <Ionicons name={item.icon} size={28} color="#fff" />
+                  <LinearGradient
+                    colors={item.gradient}
+                    start={[0, 0]}
+                    end={[1, 1]}
+                    style={styles.adCardOverlay} // full size overlay
+                  >
+                    <View style={styles.adContent}>
+                      <View style={styles.adIconWrap}>
+                        <Ionicons name={item.icon} size={28} color="#fff" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.adBadge}>ADVERTISEMENT</Text>
+                        <Text style={styles.adTitle}>{item.title}</Text>
+                        <Text style={styles.adSubtitle}>{item.subtitle}</Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.adBadge}>ADVERTISEMENT</Text>
-                      <Text style={styles.adTitle}>{item.title}</Text>
-                      <Text style={styles.adSubtitle}>{item.subtitle}</Text>
-                    </View>
-                  </View>
-                </LinearGradient>
+                  </LinearGradient>
+                </ImageBackground>
               )}
             />
             {/* Dot indicators */}
@@ -247,10 +258,7 @@ export default function HomeScreen() {
               {ADS.map((_, i) => (
                 <View
                   key={i}
-                  style={[
-                    styles.adDot,
-                    i === activeAd && styles.adDotActive,
-                  ]}
+                  style={[styles.adDot, i === activeAd && styles.adDotActive]}
                 />
               ))}
             </View>
@@ -383,13 +391,19 @@ const styles = StyleSheet.create({
     width: AD_WIDTH,
     height: AD_HEIGHT,
     borderRadius: 20,
-    padding: 16,
+    justifyContent: "center",
+  },
+  adCardOverlay: {
+    flex: 1,                 
+    borderRadius: 12,       
+    padding: 16,             
     justifyContent: "center",
   },
   adContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
+    padding: 16,
   },
   adIconWrap: {
     width: 52,
