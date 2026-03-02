@@ -270,15 +270,18 @@ export default function ScanScreen() {
         waste_type: analysis.waste_type,
         severity: analysis.severity,
         ai_confidence: analysis.confidence,
+        trash_count: summary?.total_count || 1,
         description: description || `${analysis.waste_type} waste detected — ${analysis.action}`,
       });
 
       await refreshProfile();
+      const trashCount = summary?.total_count || 1;
+      const pointsEarned = trashCount * 33;
       setModalData({
         success: true,
         title: "Report Submitted!",
         message: `Waste type: ${analysis.waste_type} · Severity: ${analysis.severity}`,
-        detail: "+50 Eco-Points",
+        detail: `+${pointsEarned} Eco-Points (${trashCount} item${trashCount > 1 ? "s" : ""})`,
         detailIcon: "leaf",
       });
       setModalVisible(true);
@@ -582,7 +585,7 @@ export default function ScanScreen() {
           ) : (
             <>
               <Ionicons name="cloud-upload" size={20} color="#000" />
-              <Text style={styles.submitText}>Submit Report (+50 pts)</Text>
+              <Text style={styles.submitText}>Submit Report (+{(summary?.total_count || 1) * 33} pts)</Text>
             </>
           )}
         </TouchableOpacity>

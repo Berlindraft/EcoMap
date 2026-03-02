@@ -119,6 +119,7 @@ class ReportCreate(BaseModel):
     waste_type: str = "mixed"
     severity: str = "medium"
     ai_confidence: float = 0.0
+    trash_count: int = 1
     description: Optional[str] = ""
 
 class ReportOut(BaseModel):

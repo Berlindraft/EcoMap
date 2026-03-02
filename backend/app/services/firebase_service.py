@@ -119,11 +119,15 @@ def create_report(data: dict) -> dict:
         "ai_confidence": data.get("ai_confidence", 0.0),
         "status": "pending",
         "description": data.get("description", ""),
+        "trash_count": max(data.get("trash_count", 1), 1),
         "created_at": _now(),
     }
+    # Award eco points: 33 per trash entity detected
+    trash_count = max(data.get("trash_count", 1), 1)
+    points = trash_count * 33
+    doc["points_earned"] = points
     db.collection("reports").document(report_id).set(doc)
-    # Award eco points for reporting
-    add_eco_points(data["user_id"], "report", 50)
+    add_eco_points(data["user_id"], "report", points)
     return doc
 
 

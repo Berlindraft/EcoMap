@@ -84,6 +84,7 @@ export async function submitReport(data: {
   waste_type: string;
   severity: string;
   ai_confidence: number;
+  trash_count?: number;
   description?: string;
 }) {
   return request("/reports", { method: "POST", body: JSON.stringify(data) });
