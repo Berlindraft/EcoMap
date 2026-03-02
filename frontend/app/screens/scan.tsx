@@ -644,7 +644,14 @@ export default function ScanScreen() {
 
   // ─── Live camera mode ───────────────────
   return (
-    <View style={styles.container} onLayout={(e) => setViewH(e.nativeEvent.layout.height)}>
+    <View
+      style={styles.container}
+      onLayout={(e) => setViewH(e.nativeEvent.layout.height)}
+      onTouchStart={handlePinchStart}
+      onTouchMove={handlePinchMove}
+      onTouchEnd={handlePinchEnd}
+      onTouchCancel={handlePinchEnd}
+    >
       {/* Camera — no children allowed */}
       <CameraView
         ref={cameraRef}
@@ -652,14 +659,6 @@ export default function ScanScreen() {
         facing="back"
         enableTorch={torchEnabled}
         zoom={zoom}
-      />
-
-      <View
-        style={styles.pinchLayer}
-        onTouchStart={handlePinchStart}
-        onTouchMove={handlePinchMove}
-        onTouchEnd={handlePinchEnd}
-        onTouchCancel={handlePinchEnd}
       />
 
       {/* Camera controls */}
@@ -813,10 +812,6 @@ const styles = StyleSheet.create({
   },
 
   // ─── Camera controls ───────────────
-  pinchLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 6,
-  },
   cameraControls: {
     position: "absolute",
     top: 60,
