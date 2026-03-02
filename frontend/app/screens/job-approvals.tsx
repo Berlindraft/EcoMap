@@ -13,7 +13,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
-import { fetchPendingJobs, approveJob, rejectJob } from "../../services/api";
+import { useDataCache } from "../../contexts/DataCache";
+import { approveJob, rejectJob } from "../../services/api";
 
 type PendingJob = {
   job_id: string;
@@ -31,30 +32,16 @@ type PendingJob = {
 
 export default function JobApprovalsScreen() {
   const { profile } = useAuth();
+  const { pendingJobs: jobs, pendingJobsLoading: loading, refreshPendingJobs, refreshJobs } = useDataCache();
   const router = useRouter();
-  const [jobs, setJobs] = useState<PendingJob[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const loadPending = useCallback(async () => {
-    try {
-      const data = await fetchPendingJobs();
-      setJobs(data);
-    } catch (err) {
-      console.log("Error loading pending jobs:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      setLoading(true);
-      loadPending();
-    }, [loadPending])
-  );
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshPendingJobs();
+    setRefreshing(false);
+  };
 
   const handleApprove = async (jobId: string, title: string) => {
     if (!profile?.uid) return;
@@ -67,7 +54,7 @@ export default function JobApprovalsScreen() {
           setActionLoading(jobId);
           try {
             await approveJob(jobId, profile.uid);
-            setJobs((prev) => prev.filter((j) => j.job_id !== jobId));
+            await Promise.all([refreshPendingJobs(), refreshJobs()]);
             Alert.alert("Approved ✅", "The job is now visible to users.");
           } catch (err) {
             Alert.alert("Error", "Failed to approve job.");
@@ -90,7 +77,7 @@ export default function JobApprovalsScreen() {
           setActionLoading(jobId);
           try {
             await rejectJob(jobId, profile.uid);
-            setJobs((prev) => prev.filter((j) => j.job_id !== jobId));
+            await refreshPendingJobs();
             Alert.alert("Rejected", "Credits and tokens have been refunded.");
           } catch (err) {
             Alert.alert("Error", "Failed to reject job.");
@@ -130,7 +117,7 @@ export default function JobApprovalsScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadPending(); }} tintColor="#84cc16" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#84cc16" />}
     >
       {/* Header */}
       <View style={styles.header}>

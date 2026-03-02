@@ -25,6 +25,9 @@ import {
   fetchDashboardStats,
   fetchAllUsers,
   fetchProducts,
+  fetchJobs,
+  fetchPendingJobs,
+  fetchTokenTransactions,
 } from "../services/api";
 
 // ─── Types ─────────────────────────────
@@ -37,6 +40,9 @@ interface DataCacheType {
   dashboardStats: any | null;
   allUsers: any[];
   products: any[];
+  jobs: any[];
+  pendingJobs: any[];
+  tokenTransactions: any[];
 
   // Loading flags
   reportsLoading: boolean;
@@ -44,6 +50,9 @@ interface DataCacheType {
   dashboardLoading: boolean;
   usersLoading: boolean;
   productsLoading: boolean;
+  jobsLoading: boolean;
+  pendingJobsLoading: boolean;
+  tokensLoading: boolean;
 
   // Refresh helpers (call after mutations or pull-to-refresh)
   refreshReports: () => Promise<void>;
@@ -51,6 +60,9 @@ interface DataCacheType {
   refreshDashboard: () => Promise<void>;
   refreshUsers: () => Promise<void>;
   refreshProducts: () => Promise<void>;
+  refreshJobs: () => Promise<void>;
+  refreshPendingJobs: () => Promise<void>;
+  refreshTokens: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 
@@ -67,12 +79,18 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   const [dashboardStats, setDashboardStats] = useState<any | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [pendingJobs, setPendingJobs] = useState<any[]>([]);
+  const [tokenTransactions, setTokenTransactions] = useState<any[]>([]);
 
   const [reportsLoading, setReportsLoading] = useState(true);
   const [rewardsLoading, setRewardsLoading] = useState(true);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [pendingJobsLoading, setPendingJobsLoading] = useState(true);
+  const [tokensLoading, setTokensLoading] = useState(true);
 
   // ── Individual refreshers ────────────
 
@@ -136,6 +154,40 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     }
   }, [profile?.uid, profile?.role]);
 
+  const refreshJobs = useCallback(async () => {
+    try {
+      const data = await fetchJobs();
+      setJobs(data);
+    } catch (e) {
+      console.log("Cache: jobs error", e);
+    } finally {
+      setJobsLoading(false);
+    }
+  }, []);
+
+  const refreshPendingJobs = useCallback(async () => {
+    try {
+      const data = await fetchPendingJobs();
+      setPendingJobs(data);
+    } catch (e) {
+      console.log("Cache: pending jobs error", e);
+    } finally {
+      setPendingJobsLoading(false);
+    }
+  }, []);
+
+  const refreshTokens = useCallback(async () => {
+    if (!profile?.uid) return;
+    try {
+      const data = await fetchTokenTransactions(profile.uid);
+      setTokenTransactions(data);
+    } catch (e) {
+      console.log("Cache: tokens error", e);
+    } finally {
+      setTokensLoading(false);
+    }
+  }, [profile?.uid]);
+
   const refreshAll = useCallback(async () => {
     await Promise.all([
       refreshReports(),
@@ -143,8 +195,11 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       refreshDashboard(),
       refreshUsers(),
       refreshProducts(),
+      refreshJobs(),
+      refreshPendingJobs(),
+      refreshTokens(),
     ]);
-  }, [refreshReports, refreshRewards, refreshDashboard, refreshUsers, refreshProducts]);
+  }, [refreshReports, refreshRewards, refreshDashboard, refreshUsers, refreshProducts, refreshJobs, refreshPendingJobs, refreshTokens]);
 
   // ── Prefetch on login ────────────────
 
@@ -153,6 +208,8 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       // Fire all fetches in parallel — screens will render cached data instantly
       refreshReports();
       refreshRewards();
+      refreshJobs();
+      refreshTokens();
 
       // Admin/partner get extra data prefetched
       const role = profile.role || "user";
@@ -162,6 +219,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       }
       if (role === "admin") {
         refreshUsers();
+        refreshPendingJobs();
       }
     }
   }, [profile?.uid]);
@@ -175,16 +233,25 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         dashboardStats,
         allUsers,
         products,
+        jobs,
+        pendingJobs,
+        tokenTransactions,
         reportsLoading,
         rewardsLoading,
         dashboardLoading,
         usersLoading,
         productsLoading,
+        jobsLoading,
+        pendingJobsLoading,
+        tokensLoading,
         refreshReports,
         refreshRewards,
         refreshDashboard,
         refreshUsers,
         refreshProducts,
+        refreshJobs,
+        refreshPendingJobs,
+        refreshTokens,
         refreshAll,
       }}
     >

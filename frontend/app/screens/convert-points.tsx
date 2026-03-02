@@ -12,12 +12,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
+import { useDataCache } from "../../contexts/DataCache";
 import { convertPointsToCredits } from "../../services/api";
 
 const PRESET_POINTS = [5, 10, 25, 50, 100];
 
 export default function ConvertPointsScreen() {
   const { profile, refreshProfile } = useAuth();
+  const { refreshTokens } = useDataCache();
   const router = useRouter();
 
   const [amount, setAmount] = useState("");
@@ -35,6 +37,7 @@ export default function ConvertPointsScreen() {
     try {
       await convertPointsToCredits(profile.uid, pointsNum);
       if (refreshProfile) await refreshProfile();
+      await refreshTokens();
       setAmount("");
       Alert.alert("Converted! ✅", `${pointsNum} points → ${creditsGained} credits`);
     } catch (err: any) {

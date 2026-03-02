@@ -12,7 +12,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
-import { fetchJobs, applyToJob } from "../../services/api";
+import { useDataCache } from "../../contexts/DataCache";
+import { applyToJob } from "../../services/api";
 
 type Job = {
   job_id: string;
@@ -30,30 +31,14 @@ type Job = {
 
 export default function JobsScreen() {
   const { profile } = useAuth();
+  const { jobs, jobsLoading: loading, refreshJobs } = useDataCache();
   const router = useRouter();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadJobs = useCallback(async () => {
-    try {
-      const data = await fetchJobs();
-      setJobs(data);
-    } catch (err) {
-      console.log("Error loading jobs:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadJobs();
-  }, []);
-
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadJobs();
+    await refreshJobs();
+    setRefreshing(false);
   };
 
   const handleApply = async (jobId: string) => {

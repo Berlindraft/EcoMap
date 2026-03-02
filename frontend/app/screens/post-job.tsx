@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../../contexts/AuthContext";
+import { useDataCache } from "../../contexts/DataCache";
 import { createJob, uploadImage } from "../../services/api";
 
 const JOB_TYPES = [
@@ -28,6 +29,7 @@ const CREDITS_PER_POST = 10;
 
 export default function PostJobScreen() {
   const { profile, refreshProfile } = useAuth();
+  const { refreshJobs, refreshPendingJobs } = useDataCache();
   const router = useRouter();
 
   const [title, setTitle] = useState("");
@@ -102,6 +104,7 @@ export default function PostJobScreen() {
       });
 
       if (refreshProfile) await refreshProfile();
+      await Promise.all([refreshJobs(), refreshPendingJobs()]);
 
       Alert.alert(
         "Job Submitted! 🎉",

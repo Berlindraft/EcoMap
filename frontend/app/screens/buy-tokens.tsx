@@ -13,7 +13,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
-import { purchaseTokens, fetchTokenTransactions } from "../../services/api";
+import { useDataCache } from "../../contexts/DataCache";
+import { purchaseTokens } from "../../services/api";
 
 type Transaction = {
   transaction_id: string;
@@ -27,30 +28,21 @@ const PRESET_AMOUNTS = [50, 100, 250, 500, 1000];
 
 export default function BuyTokensScreen() {
   const { profile, refreshProfile } = useAuth();
+  const { tokenTransactions, tokensLoading: loading, refreshTokens } = useDataCache();
   const router = useRouter();
 
   const [buyAmount, setBuyAmount] = useState("");
   const [purchasing, setPurchasing] = useState(false);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const userTokens = profile?.eco_tokens_balance ?? 0;
+  const transactions = tokenTransactions.filter((t: Transaction) => t.type === "purchase");
 
-  const loadTransactions = useCallback(async () => {
-    if (!profile?.uid) return;
-    try {
-      const data = await fetchTokenTransactions(profile.uid);
-      setTransactions(data.filter((t: Transaction) => t.type === "purchase"));
-    } catch (err) {
-      console.log("Error loading transactions:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [profile?.uid]);
-
-  useEffect(() => { loadTransactions(); }, [loadTransactions]);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshTokens();
+    setRefreshing(false);
+  };
 
   const handleBuy = async () => {
     const amount = parseInt(buyAmount);
@@ -59,8 +51,8 @@ export default function BuyTokensScreen() {
     try {
       await purchaseTokens(profile.uid, amount);
       if (refreshProfile) await refreshProfile();
+      await refreshTokens();
       setBuyAmount("");
-      loadTransactions();
       Alert.alert("Tokens Purchased! 💎", `${amount} Eco Tokens added to your balance.`);
     } catch (err: any) {
       Alert.alert("Error", err?.message || "Purchase failed.");
@@ -83,7 +75,7 @@ export default function BuyTokensScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadTransactions(); }} tintColor="#84cc16" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#84cc16" />}
     >
       {/* Header */}
       <View style={styles.header}>
