@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
-import { redeemReward } from "../../services/api";
+import { redeemReward, fetchAllUsers } from "../../services/api";
 import { useDataCache } from "../../contexts/DataCache";
 import ResultModal from "../../components/ResultModal";
 
@@ -25,12 +25,20 @@ type Reward = {
   partner_name: string;
 };
 
+type LeaderboardUser = {
+  uid: string;
+  full_name: string;
+  eco_points_balance: number;
+};
+
 export default function RewardsScreen() {
   const { profile, refreshProfile } = useAuth();
   const { rewards, rewardsLoading, refreshRewards } = useDataCache();
   const [refreshing, setRefreshing] = useState(false);
   const [redeeming, setRedeeming] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [leaderboardTop10, setLeaderboardTop10] = useState<LeaderboardUser[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [modalData, setModalData] = useState<{
     success: boolean;
     title: string;
@@ -39,9 +47,28 @@ export default function RewardsScreen() {
     detailIcon?: string;
   }>({ success: false, title: "", message: "" });
 
+  useEffect(() => {
+    fetchLeaderboard();
+  }, []);
+
+  const fetchLeaderboard = async () => {
+    try {
+      setLeaderboardLoading(true);
+      const users = await fetchAllUsers();
+      const sorted = (users as LeaderboardUser[]).sort(
+        (a, b) => (b.eco_points_balance || 0) - (a.eco_points_balance || 0)
+      );
+      setLeaderboardTop10(sorted.slice(0, 10));
+    } catch (error) {
+      console.error("Failed to fetch leaderboard:", error);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refreshRewards(), refreshProfile()]);
+    await Promise.all([refreshRewards(), refreshProfile(), fetchLeaderboard()]);
     setRefreshing(false);
   };
 
@@ -169,6 +196,70 @@ export default function RewardsScreen() {
             );
           })}
         </View>
+
+        {/* Top 10 Leaderboard */}
+        <View style={styles.leaderboardSection}>
+          <Text style={styles.leaderboardHeader}>🏆 Top 10 Leaderboard</Text>
+          {leaderboardLoading ? (
+            <ActivityIndicator color="#84cc16" size="small" style={{ marginVertical: 12 }} />
+          ) : leaderboardTop10.length > 0 ? (
+            <>
+              {/* Top 3 Horizontal */}
+              <View style={styles.topRankingsContainer}>
+                {leaderboardTop10.slice(0, 3).map((user, index) => (
+                  <View key={user.uid} style={styles.rankingCard}>
+                    <View style={styles.rankBadge}>
+                      <Text style={styles.rankNumber}>{index + 1}</Text>
+                      <Text style={styles.medalIcon}>
+                        {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
+                      </Text>
+                    </View>
+                    <View style={styles.rankingInfo}>
+                      <Text style={styles.rankingName} numberOfLines={1}>{user.full_name}</Text>
+                      <Text style={styles.rankingPoints}>{user.eco_points_balance} pts</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Top 4-10 Vertical */}
+              {leaderboardTop10.length > 3 && (
+                <>
+                  <View style={styles.leaderboardHeaderRow}>
+                    <View style={styles.leaderboardRank}>
+                      <Text style={styles.leaderboardHeaderCell}>Rank</Text>
+                    </View>
+                    <View style={styles.leaderboardUserInfo}>
+                      <Text style={styles.leaderboardHeaderCell}>Name</Text>
+                    </View>
+                    <View style={styles.leaderboardPointsContainer}>
+                      <Text style={[styles.leaderboardHeaderCell, { textAlign: "right" }]}>Points</Text>
+                    </View>
+                  </View>
+                  <View style={styles.leaderboardList}>
+                    {leaderboardTop10.slice(3).map((user, index) => (
+                      <View key={user.uid} style={styles.leaderboardRow}>
+                        <View style={styles.leaderboardRank}>
+                          <Text style={styles.leaderboardRankNumber}>{index + 4}</Text>
+                        </View>
+                        <View style={styles.leaderboardUserInfo}>
+                          <Text style={styles.leaderboardUserName} numberOfLines={1}>
+                            {user.full_name}
+                          </Text>
+                        </View>
+                        <View style={styles.leaderboardPointsContainer}>
+                          <Text style={styles.leaderboardPoints}>{user.eco_points_balance}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+            </>
+          ) : (
+            <Text style={styles.emptyText}>No users yet</Text>
+          )}
+        </View>
       </ScrollView>
 
       <ResultModal
@@ -239,4 +330,133 @@ const styles = StyleSheet.create({
   redeemText: { fontSize: 12, fontWeight: "700" },
   redeemTextActive: { color: "#000" },
   redeemTextDisabled: { color: "#9ca3af" },
+  leaderboardSection: {
+    marginTop: 32,
+    marginBottom: 24,
+  },
+  leaderboardHeader: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 16,
+  },
+  topRankingsContainer: {
+    gap: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  rankingCard: {
+    flex: 1,
+    flexDirection: "column",
+    alignItems: "center",
+    backgroundColor: "#27272a",
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#3f3f46",
+    minWidth: "30%",
+  },
+  rankBadge: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(132, 204, 22, 0.1)",
+    marginBottom: 8,
+  },
+  rankNumber: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#84cc16",
+  },
+  medalIcon: {
+    fontSize: 20,
+    marginTop: 2,
+  },
+  rankingInfo: {
+    flex: 1,
+    alignItems: "center",
+    width: "100%",
+  },
+  rankingName: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  rankingPoints: {
+    fontSize: 11,
+    color: "#84cc16",
+    fontWeight: "600",
+  },
+  leaderboardList: {
+    backgroundColor: "#27272a",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#3f3f46",
+    overflow: "hidden",
+  },
+  leaderboardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#3f3f46",
+  },
+  leaderboardRank: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(132, 204, 22, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  leaderboardRankNumber: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#84cc16",
+  },
+  leaderboardUserInfo: {
+    flex: 1,
+  },
+  leaderboardUserName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  leaderboardPointsContainer: {
+    alignItems: "flex-end",
+  },
+  leaderboardPoints: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#84cc16",
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#9ca3af",
+    textAlign: "center",
+    paddingVertical: 24,
+  },
+  leaderboardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    backgroundColor: "rgba(132, 204, 22, 0.1)",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    marginBottom: -1,
+  },
+  leaderboardHeaderCell: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#84cc16",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
 });
