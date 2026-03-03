@@ -1,16 +1,21 @@
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { View } from "react-native";
 import Navbar from "../navbar";
 
 export default function ScreensLayout() {
+  const pathname = usePathname(); // Get current route path
+
+  // Extract the screen name (last part of the path)
+  const currentScreen = pathname?.split("/").pop();
+
   return (
     <View style={{ flex: 1 }}>
       {/* Stack for Screens — leave room for the navbar */}
-      <View style={{ flex: 1, marginBottom: 80 }}>
+      <View style={{ flex: 1, marginBottom: currentScreen === "scan" ? 0 : 80 }}>
         <Stack screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}>
           <Stack.Screen name="home" />
           <Stack.Screen name="map" />
-          <Stack.Screen name="scan" />
+          <Stack.Screen name="scan"/>
           <Stack.Screen name="jobs" />
           <Stack.Screen name="post-job" />
           <Stack.Screen name="buy-tokens" />
@@ -24,8 +29,8 @@ export default function ScreensLayout() {
         </Stack>
       </View>
 
-      {/* Bottom Navbar */}
-      <Navbar />
+      {/* Bottom Navbar — hide on "scan" screen */}
+      {currentScreen !== "scan" && <Navbar />}
     </View>
   );
 }

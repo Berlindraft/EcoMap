@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
@@ -63,6 +64,11 @@ export default function ScanScreen() {
   const { profile, refreshProfile } = useAuth();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
+  const [torchEnabled, setTorchEnabled] = useState(false);
+  const [zoom, setZoom] = useState(0);
+  const pinchStartDistanceRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef(0);
+  const router = useRouter();
 
   // Detection state
   const [detections, setDetections] = useState<Detection[]>([]);
@@ -245,6 +251,38 @@ export default function ScanScreen() {
     }
   };
 
+  const getTouchDistance = (a: { pageX: number; pageY: number }, b: { pageX: number; pageY: number }) => {
+    const dx = a.pageX - b.pageX;
+    const dy = a.pageY - b.pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handlePinchStart = (event: any) => {
+    const touches = event?.nativeEvent?.touches;
+    if (!touches || touches.length !== 2) return;
+    pinchStartDistanceRef.current = getTouchDistance(touches[0], touches[1]);
+    pinchStartZoomRef.current = zoom;
+  };
+
+  const handlePinchMove = (event: any) => {
+    const touches = event?.nativeEvent?.touches;
+    if (!touches || touches.length !== 2 || !pinchStartDistanceRef.current) return;
+
+    const currentDistance = getTouchDistance(touches[0], touches[1]);
+    const distanceDelta = currentDistance - pinchStartDistanceRef.current;
+    const sensitivity = 0.003;
+    const nextZoom = Math.max(0, Math.min(0.9, pinchStartZoomRef.current + distanceDelta * sensitivity));
+    setZoom(Number(nextZoom.toFixed(2)));
+  };
+
+  const handlePinchEnd = (event: any) => {
+    const touches = event?.nativeEvent?.touches;
+    if (!touches || touches.length < 2) {
+      pinchStartDistanceRef.current = null;
+      pinchStartZoomRef.current = zoom;
+    }
+  };
+
   // ─── Submit report ──────────────────────
   const handleSubmit = async () => {
     if (!profile || !analysis) return;
@@ -325,6 +363,10 @@ export default function ScanScreen() {
     setHeading(null);
     setScanStage("idle");
     progressAnim.setValue(0);
+  };
+
+  const handleBackButton = () => {
+    router.back();
   };
 
   // ─── Permission handling ────────────────
@@ -460,7 +502,7 @@ export default function ScanScreen() {
 
   if (!isLive && frozenUri) {
     return (
-      <ScrollView style={styles.reportContainer} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView style={styles.reportContainer}>
         {/* Frozen image with bounding box overlays — matches camera framing */}
         <View style={[styles.frozenImageContainer, { height: containerH }]}>
           <Image
@@ -608,13 +650,47 @@ export default function ScanScreen() {
 
   // ─── Live camera mode ───────────────────
   return (
-    <View style={styles.container} onLayout={(e) => setViewH(e.nativeEvent.layout.height)}>
+    <View
+      style={styles.container}
+      onLayout={(e) => setViewH(e.nativeEvent.layout.height)}
+      onTouchStart={handlePinchStart}
+      onTouchMove={handlePinchMove}
+      onTouchEnd={handlePinchEnd}
+      onTouchCancel={handlePinchEnd}
+    >
       {/* Camera — no children allowed */}
       <CameraView
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
         facing="back"
+        enableTorch={torchEnabled}
+        zoom={zoom}
       />
+
+      
+
+      {/* Camera controls */}
+      <View style={styles.cameraControls}>
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={() => setTorchEnabled((prev) => !prev)}
+        >
+          <Ionicons
+            name={torchEnabled ? "flash" : "flash-off"}
+            size={20}
+            color={torchEnabled ? "#84cc16" : "#fff"}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={[styles.backButton, {top: 60}]} onPress={handleBackButton}>
+        <Ionicons name="arrow-back" size={24} color="#fff" />
+      </TouchableOpacity>
+      
+      <View style={styles.zoomControls} pointerEvents="none">
+        <Ionicons name="search" size={14} color="#fff" />
+        <Text style={styles.zoomText}>{(1 + zoom).toFixed(1)}x · Pinch to zoom</Text>
+      </View>
 
       {/* Viewfinder guide — shows the center 90% scan area */}
       <View style={styles.viewfinderOverlay} pointerEvents="none">
@@ -731,7 +807,7 @@ const styles = StyleSheet.create({
   // ─── Status badge ───────────────────
   statusBadge: {
     position: "absolute",
-    top: 60,
+    top: 120,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
@@ -745,6 +821,48 @@ const styles = StyleSheet.create({
     color: "#84cc16",
     fontSize: 13,
     fontWeight: "700",
+  },
+
+  // ─── Camera controls ───────────────
+  cameraControls: {
+    position: "absolute",
+    top: 60,
+    right: 16,
+    flexDirection: "row",
+    gap: 10,
+    zIndex: 20,
+  },
+  controlButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  zoomControls: {
+    position: "absolute",
+    top: 64,
+    right: "30%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    zIndex: 20,
+  },
+  zoomText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    minWidth: 72,
+    textAlign: "center",
   },
 
   // ─── Scan button ────────────────────
@@ -880,6 +998,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
+    marginBottom: 40
   },
   submitText: { color: "#000", fontSize: 15, fontWeight: "800" },
 
@@ -916,22 +1035,22 @@ const styles = StyleSheet.create({
     borderColor: "#84cc16",
   },
   cornerTL: {
-    top: 0, left: 0,
+    top: 150, left: 50,
     borderTopWidth: 3, borderLeftWidth: 3,
     borderTopLeftRadius: 4,
   },
   cornerTR: {
-    top: 0, right: 0,
+    top: 150, right: 50,
     borderTopWidth: 3, borderRightWidth: 3,
     borderTopRightRadius: 4,
   },
   cornerBL: {
-    bottom: 0, left: 0,
+    bottom: 150, left: 50,
     borderBottomWidth: 3, borderLeftWidth: 3,
     borderBottomLeftRadius: 4,
   },
   cornerBR: {
-    bottom: 0, right: 0,
+    bottom: 150, right: 50,
     borderBottomWidth: 3, borderRightWidth: 3,
     borderBottomRightRadius: 4,
   },
