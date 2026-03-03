@@ -78,6 +78,84 @@ REPORTS = [
     {"lat": 10.3303, "lng": 124.0089, "image": "trash1.jpeg", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile in Compostela"},
     {"lat": 10.2001, "lng": 123.7583, "image": "trash2.png", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near San Fernando"},
     {"lat": 10.1435, "lng": 123.7656, "image": "trash3.png", "waste_type": "mixed", "severity": "critical", "description": "Illegal dumping in Sibonga"},
+
+    # ===== Carreta / North Bus Terminal =====
+{"lat": 10.3118, "lng": 123.9154, "image": "trash5.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near North Bus Terminal"},
+{"lat": 10.3127, "lng": 123.9166, "image": "trash6.webp", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile near roadside stalls"},
+
+# ===== Labangon =====
+{"lat": 10.2983, "lng": 123.8834, "image": "trash7.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic bottles near Labangon bridge"},
+{"lat": 10.2972, "lng": 123.8822, "image": "trash1.jpeg", "waste_type": "mixed", "severity": "critical", "description": "Garbage accumulation near drainage"},
+
+# ===== Basak / San Nicolas =====
+{"lat": 10.2915, "lng": 123.8806, "image": "trash2.png", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near public market"},
+{"lat": 10.2903, "lng": 123.8793, "image": "trash3.png", "waste_type": "mixed", "severity": "critical", "description": "Illegal dumping near alleyway"},
+
+# ===== Pardo =====
+{"lat": 10.2695, "lng": 123.8468, "image": "trash4.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near Pardo public market"},
+{"lat": 10.2684, "lng": 123.8454, "image": "trash5.webp", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile beside residential area"},
+
+# ===== Cordova =====
+{"lat": 10.2518, "lng": 123.9499, "image": "trash6.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic debris near Cordova shoreline"},
+{"lat": 10.2531, "lng": 123.9512, "image": "trash7.webp", "waste_type": "mixed", "severity": "critical", "description": "Dumped garbage near fishing boats"},
+
+# ===== Oslob =====
+{"lat": 9.5204, "lng": 123.4316, "image": "trash1.jpeg", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near tourist shoreline"},
+{"lat": 9.5216, "lng": 123.4331, "image": "trash2.png", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile near roadside vendors"},
+
+# ===== Moalboal =====
+{"lat": 9.9435, "lng": 123.3998, "image": "trash3.png", "waste_type": "plastic", "severity": "high", "description": "Plastic trash near beach area"},
+{"lat": 9.9446, "lng": 123.4011, "image": "trash4.webp", "waste_type": "mixed", "severity": "critical", "description": "Illegal dumping near resort road"},
+
+# ===== Carbon Market Area (Cluster 1) =====
+{"lat": 10.2955, "lng": 123.8990, "image": "trash1.jpeg", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile near Carbon public market"},
+{"lat": 10.2960, "lng": 123.8998, "image": "trash2.png", "waste_type": "biodegradable", "severity": "medium", "description": "Vegetable waste near market stalls"},
+{"lat": 10.2952, "lng": 123.8982, "image": "trash3.png", "waste_type": "plastic", "severity": "high", "description": "Plastic packaging near street vendors"},
+{"lat": 10.2967, "lng": 123.9001, "image": "trash4.webp", "waste_type": "mixed", "severity": "critical", "description": "Overflowing trash beside drainage"},
+{"lat": 10.2948, "lng": 123.8987, "image": "trash5.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic bags scattered near loading area"},
+
+# ===== Colon Street Area (Cluster 2) =====
+{"lat": 10.2977, "lng": 123.9008, "image": "trash6.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near Colon sidewalk"},
+{"lat": 10.2981, "lng": 123.9015, "image": "trash7.webp", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile near jeepney stop"},
+{"lat": 10.2974, "lng": 123.9021, "image": "trash1.jpeg", "waste_type": "biodegradable", "severity": "medium", "description": "Food waste near fast food stalls"},
+{"lat": 10.2986, "lng": 123.9029, "image": "trash2.png", "waste_type": "plastic", "severity": "high", "description": "Plastic cups near convenience store"},
+{"lat": 10.2970, "lng": 123.9010, "image": "trash3.png", "waste_type": "mixed", "severity": "critical", "description": "Garbage accumulation near alley"},
+
+# ===== South Road Properties (Cluster 3) =====
+{"lat": 10.2798, "lng": 123.8701, "image": "trash4.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic bottles near seaside road"},
+{"lat": 10.2805, "lng": 123.8712, "image": "trash5.webp", "waste_type": "mixed", "severity": "critical", "description": "Dumped garbage near seawall"},
+{"lat": 10.2811, "lng": 123.8720, "image": "trash6.webp", "waste_type": "biodegradable", "severity": "medium", "description": "Food waste near food stalls"},
+{"lat": 10.2791, "lng": 123.8694, "image": "trash7.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic debris near parking area"},
+{"lat": 10.2787, "lng": 123.8686, "image": "trash1.jpeg", "waste_type": "mixed", "severity": "critical", "description": "Illegal dumping near empty lot"},
+
+# ===== Talamban / University Area (Cluster 4) =====
+{"lat": 10.3689, "lng": 123.9150, "image": "trash2.png", "waste_type": "plastic", "severity": "high", "description": "Plastic cups near university gate"},
+{"lat": 10.3693, "lng": 123.9162, "image": "trash3.png", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile near student housing"},
+{"lat": 10.3700, "lng": 123.9170, "image": "trash4.webp", "waste_type": "biodegradable", "severity": "medium", "description": "Food waste near carinderia"},
+{"lat": 10.3711, "lng": 123.9178, "image": "trash5.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic bottles near roadside"},
+{"lat": 10.3680, "lng": 123.9144, "image": "trash6.webp", "waste_type": "mixed", "severity": "critical", "description": "Overflowing trash near drainage"},
+
+# ===== Mandaue City (Cluster 5) =====
+{"lat": 10.3398, "lng": 123.9395, "image": "trash7.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near highway"},
+{"lat": 10.3406, "lng": 123.9403, "image": "trash1.jpeg", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile near industrial area"},
+{"lat": 10.3414, "lng": 123.9412, "image": "trash2.png", "waste_type": "biodegradable", "severity": "medium", "description": "Food waste near roadside vendors"},
+{"lat": 10.3391, "lng": 123.9386, "image": "trash3.png", "waste_type": "plastic", "severity": "high", "description": "Plastic bags near drainage"},
+{"lat": 10.3384, "lng": 123.9377, "image": "trash4.webp", "waste_type": "mixed", "severity": "critical", "description": "Illegal dumping near warehouse"},
+
+# ===== Lapu-Lapu City (Cluster 6) =====
+{"lat": 10.3101, "lng": 123.9504, "image": "trash5.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near market"},
+{"lat": 10.3095, "lng": 123.9496, "image": "trash6.webp", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile near roadside"},
+{"lat": 10.3088, "lng": 123.9488, "image": "trash7.webp", "waste_type": "biodegradable", "severity": "medium", "description": "Food waste near food stalls"},
+{"lat": 10.3110, "lng": 123.9513, "image": "trash1.jpeg", "waste_type": "plastic", "severity": "high", "description": "Plastic bottles near parking area"},
+{"lat": 10.3117, "lng": 123.9520, "image": "trash2.png", "waste_type": "mixed", "severity": "critical", "description": "Illegal dumping near shoreline"},
+
+# ===== Pardo Area (Cluster 7) =====
+{"lat": 10.2699, "lng": 123.8469, "image": "trash3.png", "waste_type": "plastic", "severity": "high", "description": "Plastic waste near public market"},
+{"lat": 10.2692, "lng": 123.8461, "image": "trash4.webp", "waste_type": "mixed", "severity": "critical", "description": "Garbage pile near roadside houses"},
+{"lat": 10.2686, "lng": 123.8454, "image": "trash5.webp", "waste_type": "biodegradable", "severity": "medium", "description": "Food waste near eatery"},
+{"lat": 10.2705, "lng": 123.8478, "image": "trash6.webp", "waste_type": "plastic", "severity": "high", "description": "Plastic cups near jeepney stop"},
+{"lat": 10.2711, "lng": 123.8485, "image": "trash7.webp", "waste_type": "mixed", "severity": "critical", "description": "Illegal dumping near creek"},
+
 ]
 
 SEED_USER_ID = "seed_heatmap_user"
